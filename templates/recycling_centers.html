@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}Recycling Centers - Ecotrack{% endblock %}
+
+{% block extra_head %}
+{% if google_maps_api_key %}
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places&callback=initMap" async defer></script>
+{% else %}
+<script>
+console.warn('Google Maps API key not configured. Map will not load.');
+</script>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="page-title">Recycling Centers</h1>
+    
+    <div class="centers-container">
+        <div class="centers-list-panel">
+            <h2>Available Centers</h2>
+            {% if centers %}
+                <div class="centers-list">
+                    {% for center in centers %}
+                    <div class="center-card" data-lat="{{ center.latitude }}" data-lng="{{ center.longitude }}">
+                        <h3>{{ center.name }}</h3>
+                        <p class="center-address">📍 {{ center.address }}, {{ center.city }}</p>
+                        {% if center.phone %}
+                        <p class="center-contact">📞 {{ center.phone }}</p>
+                        {% endif %}
+                        {% if center.accepts_types %}
+                        <p class="center-types"><strong>Accepts:</strong> {{ center.accepts_types }}</p>
+                        {% endif %}
+                        {% if center.hours %}
+                        <p class="center-hours">🕐 {{ center.hours }}</p>
+                        {% endif %}
+                        <button class="btn btn-sm btn-secondary" onclick="showOnMap({{ center.latitude }}, {{ center.longitude }}, '{{ center.name }}')">Show on Map</button>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="empty-state">No recycling centers found.</p>
+            {% endif %}
+        </div>
+
+        <div class="map-panel">
+            <div id="map" style="width: 100%; height: 600px; border-radius: 8px;"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+let map;
+let markers = [];
+let infoWindows = [];
+
+// Make initMap globally accessible for Google Maps callback
+window.initMap = function() {
+    const mapElement = document.getElementById('map');
+    if (!mapElement) {
+        console.error('Map element not found');
+        return;
+    }
+
+    const defaultLocation = { lat: 27.7172, lng: 85.3240 }; // Kathmandu coordinates
+    
+    try {
+        map = new google.maps.Map(mapElement, {
+            zoom: 12,
+            center: defaultLocation,
+            mapTypeControl: true,
+            streetViewControl: true,
+            fullscreenControl: true
+        });
+
+        // Add user location if available
+        {% if user_lat and user_lng %}
+        const userLocation = { lat: {{ user_lat }}, lng: {{ user_lng }} };
+        const userMarker = new google.maps.Marker({
+            position: userLocation,
+            map: map,
+            title: 'Your Location',
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 8,
+                fillColor: '#4285F4',
+                fillOpacity: 1,
+                strokeColor: '#FFFFFF',
+                strokeWeight: 2
+            }
+        });
+        map.setCenter(userLocation);
+        {% endif %}
+
+        // Add markers for recycling centers
+        {% for center in centers %}
+        const marker{{ center.id }} = new google.maps.Marker({
+            position: { lat: {{ center.latitude }}, lng: {{ center.longitude }} },
+            map: map,
+            title: '{{ center.name|replace("'", "\\'") }}',
+            animation: google.maps.Animation.DROP
+        });
+
+        const infoWindow{{ center.id }} = new google.maps.InfoWindow({
+            content: `
+                <div style="padding: 10px; max-width: 300px;">
+                    <h3 style="margin: 0 0 10px 0; color: #2c3e50;">{{ center.name|replace("'", "\\'") }}</h3>
+                    <p style="margin: 5px 0;"><strong>Address:</strong> {{ center.address|replace("'", "\\'") }}</p>
+                    {% if center.phone %}<p style="margin: 5px 0;"><strong>Phone:</strong> {{ center.phone }}</p>{% endif %}
+                    {% if center.accepts_types %}<p style="margin: 5px 0;"><strong>Accepts:</strong> {{ center.accepts_types|replace("'", "\\'") }}</p>{% endif %}
+                    {% if center.hours %}<p style="margin: 5px 0;"><strong>Hours:</strong> {{ center.hours }}</p>{% endif %}
+                </div>
+            `
+        });
+
+        marker{{ center.id }}.addListener('click', () => {
+            // Close all other info windows
+            infoWindows.forEach(iw => iw.close());
+            infoWindow{{ center.id }}.open(map, marker{{ center.id }});
+        });
+
+        markers.push(marker{{ center.id }});
+        infoWindows.push(infoWindow{{ center.id }});
+        {% endfor %}
+
+        // If no centers, show message
+        {% if not centers %}
+        const noCentersDiv = document.createElement('div');
+        noCentersDiv.innerHTML = '<p style="text-align: center; padding: 20px; color: #666;">No recycling centers available</p>';
+        map.controls[google.maps.ControlPosition.TOP_CENTER].push(noCentersDiv);
+        {% endif %}
+
+    } catch (error) {
+        console.error('Error initializing map:', error);
+        document.getElementById('map').innerHTML = '<div style="padding: 20px; text-align: center; color: #e74c3c;"><p>Error loading map. Please check your Google Maps API key configuration.</p></div>';
+    }
+};
+
+function showOnMap(lat, lng, name) {
+    if (!map) {
+        console.error('Map not initialized');
+        return;
+    }
+    
+    const location = { lat: lat, lng: lng };
+    map.setCenter(location);
+    map.setZoom(15);
+    
+    // Find and open info window for this marker
+    markers.forEach((marker, index) => {
+        const markerPos = marker.getPosition();
+        if (Math.abs(markerPos.lat() - lat) < 0.0001 && Math.abs(markerPos.lng() - lng) < 0.0001) {
+            if (infoWindows[index]) {
+                // Close all other info windows
+                infoWindows.forEach(iw => iw.close());
+                infoWindows[index].open(map, marker);
+            }
+        }
+    });
+}
+
+// Fallback initialization if callback doesn't work
+{% if google_maps_api_key %}
+document.addEventListener('DOMContentLoaded', function() {
+    // Wait a bit for Google Maps to load if callback didn't fire
+    setTimeout(function() {
+        if (typeof google !== 'undefined' && typeof google.maps !== 'undefined' && !map) {
+            window.initMap();
+        } else if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
+            console.warn('Google Maps API not loaded. Check your API key.');
+            document.getElementById('map').innerHTML = '<div style="padding: 20px; text-align: center; color: #e74c3c;"><p>Google Maps API not loaded. Please configure your API key.</p><p style="font-size: 0.9em; margin-top: 10px;">Set GOOGLE_MAPS_API_KEY environment variable or update app.py</p></div>';
+        }
+    }, 1000);
+});
+{% else %}
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('map').innerHTML = '<div style="padding: 20px; text-align: center; color: #f39c12;"><p>Google Maps API key not configured.</p><p style="font-size: 0.9em; margin-top: 10px;">To enable maps, set the GOOGLE_MAPS_API_KEY environment variable.</p></div>';
+});
+{% endif %}
+</script>
+{% endblock %}
+

@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Waste Calculator - Ecotrack{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="page-title">Waste Reduction Calculator</h1>
+    
+    <div class="calculator-container">
+        <div class="calculator-card">
+            <h2>Calculate Your Impact</h2>
+            <form id="calculatorForm">
+                <div class="form-group">
+                    <label for="waste_amount">Waste Amount (kg)</label>
+                    <input type="number" id="waste_amount" step="0.1" min="0" value="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="waste_type_calc">Waste Type</label>
+                    <select id="waste_type_calc" required>
+                        <option value="organic">Organic</option>
+                        <option value="recyclable">Recyclable</option>
+                        <option value="hazardous">Hazardous</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="is_recycled"> This waste was recycled
+                    </label>
+                </div>
+                <button type="button" class="btn btn-primary btn-block" onclick="calculateImpact()">Calculate Impact</button>
+            </form>
+            
+            <div id="results" class="calculator-results" style="display: none;">
+                <h3>Your Environmental Impact</h3>
+                <div class="result-item">
+                    <span class="result-label">CO₂ Saved:</span>
+                    <span class="result-value" id="co2_result">0 kg</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Energy Saved:</span>
+                    <span class="result-value" id="energy_result">0 kWh</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Water Saved:</span>
+                    <span class="result-value" id="water_result">0 liters</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Trees Equivalent:</span>
+                    <span class="result-value" id="trees_result">0 trees</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="calculator-info">
+            <h2>Impact Factors</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <h3>Recycling Benefits</h3>
+                    <ul>
+                        <li>1 kg recycled = ~0.5 kg CO₂ saved</li>
+                        <li>1 ton recycled paper = 17 trees saved</li>
+                        <li>Recycling reduces energy consumption by 30-90%</li>
+                    </ul>
+                </div>
+                <div class="info-item">
+                    <h3>Waste Reduction</h3>
+                    <ul>
+                        <li>Reducing waste prevents methane emissions</li>
+                        <li>Less waste = less transportation emissions</li>
+                        <li>Conservation of natural resources</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function calculateImpact() {
+    const amount = parseFloat(document.getElementById('waste_amount').value) || 0;
+    const wasteType = document.getElementById('waste_type_calc').value;
+    const isRecycled = document.getElementById('is_recycled').checked;
+    
+    if (amount <= 0) {
+        alert('Please enter a valid waste amount');
+        return;
+    }
+    
+    let co2Saved = 0;
+    let energySaved = 0;
+    let waterSaved = 0;
+    let treesSaved = 0;
+    
+    if (isRecycled) {
+        // Recycling impact factors
+        co2Saved = amount * 0.5; // kg CO2 per kg recycled
+        energySaved = amount * 2.5; // kWh per kg (average)
+        waterSaved = amount * 10; // liters per kg (average)
+        
+        if (wasteType === 'recyclable') {
+            treesSaved = (amount / 1000) * 17; // 17 trees per ton of paper
+        }
+    } else {
+        // Waste reduction impact (preventing waste)
+        co2Saved = amount * 0.3; // Lower impact for reduction
+        energySaved = amount * 1.5;
+        waterSaved = amount * 5;
+    }
+    
+    document.getElementById('co2_result').textContent = co2Saved.toFixed(2) + ' kg';
+    document.getElementById('energy_result').textContent = energySaved.toFixed(2) + ' kWh';
+    document.getElementById('water_result').textContent = waterSaved.toFixed(2) + ' liters';
+    document.getElementById('trees_result').textContent = treesSaved.toFixed(2) + ' trees';
+    
+    document.getElementById('results').style.display = 'block';
+}
+</script>
+{% endblock %}
+

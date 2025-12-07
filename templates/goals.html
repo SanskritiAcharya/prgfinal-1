@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Goals - Ecotrack{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="page-title">Waste Reduction Goals</h1>
+    
+    <div class="goals-container">
+        <div class="create-goal-card">
+            <h2>Create New Goal</h2>
+            <form method="POST" action="{{ url_for('create_goal') }}">
+                <div class="form-group">
+                    <label for="goal_type">Goal Type</label>
+                    <select id="goal_type" name="goal_type" required>
+                        <option value="">Select goal type</option>
+                        <option value="reduce">Reduce Waste</option>
+                        <option value="recycle">Increase Recycling</option>
+                        <option value="track">Track More Entries</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="target_value">Target Value</label>
+                    <input type="number" id="target_value" name="target_value" step="0.1" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="unit">Unit</label>
+                    <select id="unit" name="unit" required>
+                        <option value="kg">Kilograms (kg)</option>
+                        <option value="count">Count</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="end_date">Target Date (Optional)</label>
+                    <input type="date" id="end_date" name="end_date">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Create Goal</button>
+            </form>
+        </div>
+
+        <div class="goals-list">
+            <h2>Your Goals</h2>
+            {% if goals %}
+                <div class="goals-grid">
+                    {% for goal in goals %}
+                    <div class="goal-card {% if goal.is_completed %}goal-completed{% endif %}">
+                        <div class="goal-header">
+                            <h3>{{ goal.goal_type|title }} Goal</h3>
+                            {% if goal.is_completed %}
+                            <span class="goal-badge">✓ Completed</span>
+                            {% endif %}
+                        </div>
+                        <div class="goal-progress">
+                            {% set progress = (goal.current_value / goal.target_value * 100) if goal.target_value else 0 %}
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: {{ [progress, 100]|min }}%"></div>
+                            </div>
+                            <p class="progress-text">
+                                {{ "%.1f"|format(goal.current_value) }} / {{ "%.1f"|format(goal.target_value) }} {{ goal.unit }}
+                            </p>
+                        </div>
+                        {% if goal.end_date %}
+                        <p class="goal-date">Target: {{ goal.end_date.strftime('%Y-%m-%d') }}</p>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="empty-state">No goals yet. Create your first goal to start tracking your progress!</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

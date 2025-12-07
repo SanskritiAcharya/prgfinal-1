@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Track Waste - Ecotrack{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="page-title">Track Your Waste</h1>
+    
+    <div class="waste-tracking-container">
+        <div class="tracking-form-card">
+            <h2>Add New Waste Entry</h2>
+            <form method="POST" action="{{ url_for('track_waste') }}">
+                <div class="form-group">
+                    <label for="waste_type">Waste Type</label>
+                    <select id="waste_type" name="waste_type" required>
+                        <option value="">Select waste type</option>
+                        <option value="organic">Organic</option>
+                        <option value="recyclable">Recyclable</option>
+                        <option value="hazardous">Hazardous</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="weight_kg">Weight (kg)</label>
+                    <input type="number" id="weight_kg" name="weight_kg" step="0.1" min="0" placeholder="e.g., 2.5">
+                </div>
+                <div class="form-group">
+                    <label for="description">Description (Optional)</label>
+                    <textarea id="description" name="description" rows="3" placeholder="Additional details about the waste..."></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Add Entry</button>
+            </form>
+        </div>
+
+        <div class="entries-list-card">
+            <h2>Your Waste Entries</h2>
+            {% if entries %}
+                <div class="entries-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Weight (kg)</th>
+                                <th>Description</th>
+                                <th>Recycled</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for entry in entries %}
+                            <tr>
+                                <td>{{ entry.disposal_date.strftime('%Y-%m-%d') }}</td>
+                                <td><span class="badge badge-{{ entry.waste_type }}">{{ entry.waste_type|title }}</span></td>
+                                <td>{{ entry.weight_kg or 'N/A' }}</td>
+                                <td>{{ entry.description or '-' }}</td>
+                                <td>{{ '✓' if entry.recycled else '✗' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="empty-state">No waste entries yet. Start tracking your waste disposal!</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+

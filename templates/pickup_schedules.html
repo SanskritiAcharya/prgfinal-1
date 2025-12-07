@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Pickup Schedules - Ecotrack{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="page-title">Waste Pickup Schedules</h1>
+    
+    <div class="schedules-container">
+        {% if schedules %}
+            <div class="schedules-grid">
+                {% for schedule in schedules %}
+                <div class="schedule-card">
+                    <div class="schedule-header">
+                        <h3>{{ schedule.area }}</h3>
+                        <span class="schedule-day">{{ schedule.pickup_day }}</span>
+                    </div>
+                    <div class="schedule-body">
+                        <p class="schedule-time">🕐 <strong>Time:</strong> {{ schedule.pickup_time }}</p>
+                        <p class="schedule-frequency">📅 <strong>Frequency:</strong> {{ schedule.frequency|title }}</p>
+                        {% if schedule.waste_types %}
+                        <p class="schedule-types">🗑️ <strong>Waste Types:</strong> {{ schedule.waste_types }}</p>
+                        {% endif %}
+                        {% if schedule.recycling_center %}
+                        <p class="schedule-center">📍 <strong>Center:</strong> {{ schedule.recycling_center.name }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <p>No pickup schedules available at the moment.</p>
+                <p>Check back later or contact your local waste management authority.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="info-box">
+        <h3>💡 Tips</h3>
+        <ul>
+            <li>Place your waste bins outside before the scheduled pickup time</li>
+            <li>Ensure waste is properly segregated according to type</li>
+            <li>Contact the recycling center if you miss a pickup</li>
+            <li>Schedules may change during holidays - check with your local authority</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+

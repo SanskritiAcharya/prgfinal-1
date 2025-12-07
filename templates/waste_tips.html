@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Waste Tips - Ecotrack{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="page-title">Waste Management Tips</h1>
+    
+    <div class="tips-container">
+        <div class="tip-category">
+            <div class="tip-header">
+                <span class="tip-icon">🍃</span>
+                <h2>Organic Waste</h2>
+            </div>
+            <ul class="tip-list">
+                {% for tip in tips.organic %}
+                <li>{{ tip }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="tip-category">
+            <div class="tip-header">
+                <span class="tip-icon">♻️</span>
+                <h2>Recyclable Waste</h2>
+            </div>
+            <ul class="tip-list">
+                {% for tip in tips.recyclable %}
+                <li>{{ tip }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="tip-category">
+            <div class="tip-header">
+                <span class="tip-icon">⚠️</span>
+                <h2>Hazardous Waste</h2>
+            </div>
+            <ul class="tip-list">
+                {% for tip in tips.hazardous %}
+                <li>{{ tip }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="tip-category">
+            <div class="tip-header">
+                <span class="tip-icon">📦</span>
+                <h2>Other Waste</h2>
+            </div>
+            <ul class="tip-list">
+                {% for tip in tips.other %}
+                <li>{{ tip }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <div class="segregation-guide">
+        <h2>Waste Segregation Guide</h2>
+        <div class="guide-grid">
+            <div class="guide-item">
+                <div class="guide-color" style="background-color: #4CAF50;"></div>
+                <h3>Green Bin - Organic</h3>
+                <p>Food scraps, vegetable peels, garden waste, coffee grounds, tea leaves</p>
+            </div>
+            <div class="guide-item">
+                <div class="guide-color" style="background-color: #2196F3;"></div>
+                <h3>Blue Bin - Recyclable</h3>
+                <p>Paper, cardboard, plastic bottles, glass, metal cans, clean containers</p>
+            </div>
+            <div class="guide-item">
+                <div class="guide-color" style="background-color: #FF9800;"></div>
+                <h3>Orange Bin - Hazardous</h3>
+                <p>Batteries, electronics, chemicals, medicines, paint, oil</p>
+            </div>
+            <div class="guide-item">
+                <div class="guide-color" style="background-color: #757575;"></div>
+                <h3>Black Bin - Other</h3>
+                <p>Non-recyclable items, mixed waste, items that don't fit other categories</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

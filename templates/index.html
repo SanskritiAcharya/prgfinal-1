@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Ecotrack{% endblock %}
+
+{% block content %}
+<div class="hero-section">
+    <div class="container">
+        <div class="hero-content">
+            <h1 class="hero-title">Smart Waste Management for Nepal</h1>
+            <p class="hero-subtitle">Track, manage, and recycle your household waste efficiently. Find nearby recycling centers and stay informed about pickup schedules.</p>
+            <div class="hero-buttons">
+                <a href="{{ url_for('register') }}" class="btn btn-primary">Get Started</a>
+                <a href="{{ url_for('waste_tips') }}" class="btn btn-secondary">Learn More</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="features-section">
+    <div class="container">
+        <h2 class="section-title">Features</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3>Track Waste</h3>
+                <p>Monitor your household waste disposal and track your recycling progress over time.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📍</div>
+                <h3>Find Centers</h3>
+                <p>Discover nearby recycling centers with interactive maps and detailed information.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📅</div>
+                <h3>Pickup Schedules</h3>
+                <p>Stay updated with waste collection schedules in your area.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">💡</div>
+                <h3>Waste Tips</h3>
+                <p>Learn proper waste segregation and disposal techniques for a cleaner environment.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="stats-section">
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat-item">
+                <h3>1000+</h3>
+                <p>Active Users</p>
+            </div>
+            <div class="stat-item">
+                <h3>50+</h3>
+                <p>Recycling Centers</p>
+            </div>
+            <div class="stat-item">
+                <h3>5000+</h3>
+                <p>Waste Entries Tracked</p>
+            </div>
+            <div class="stat-item">
+                <h3>24/7</h3>
+                <p>Support Available</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

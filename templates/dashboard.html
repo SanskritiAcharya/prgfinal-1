@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Ecotrack{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="container">
+        <h1 class="page-title">Welcome, {{ current_user.username }}!</h1>
+        
+        <div class="stats-cards">
+            <div class="stat-card">
+                <div class="stat-icon">📊</div>
+                <div class="stat-info">
+                    <h3>{{ total_entries }}</h3>
+                    <p>Total Waste Entries</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">♻️</div>
+                <div class="stat-info">
+                    <h3>{{ recycled_count }}</h3>
+                    <p>Items Recycled</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">📍</div>
+                <div class="stat-info">
+                    <h3>{{ nearby_centers|length }}</h3>
+                    <p>Nearby Centers</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="dashboard-card">
+                <h2>Recent Waste Entries</h2>
+                {% if recent_entries %}
+                    <div class="entries-list">
+                        {% for entry in recent_entries %}
+                        <div class="entry-item">
+                            <div class="entry-type">{{ entry.waste_type|title }}</div>
+                            <div class="entry-details">
+                                <span>Weight: {{ entry.weight_kg or 'N/A' }} kg</span>
+                                <span>{{ entry.disposal_date.strftime('%Y-%m-%d') }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <a href="{{ url_for('track_waste') }}" class="btn btn-secondary">View All</a>
+                {% else %}
+                    <p>No waste entries yet. <a href="{{ url_for('track_waste') }}">Start tracking</a></p>
+                {% endif %}
+            </div>
+
+            <div class="dashboard-card">
+                <h2>Nearby Recycling Centers</h2>
+                {% if nearby_centers %}
+                    <div class="centers-list">
+                        {% for center in nearby_centers[:3] %}
+                        <div class="center-item">
+                            <h4>{{ center.name }}</h4>
+                            <p>{{ center.address }}</p>
+                            <p class="center-types">Accepts: {{ center.accepts_types }}</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <a href="{{ url_for('recycling_centers') }}" class="btn btn-secondary">View All Centers</a>
+                {% else %}
+                    <p>No nearby centers found. <a href="{{ url_for('recycling_centers') }}">Browse all centers</a></p>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if achievements %}
+        <div class="dashboard-card">
+            <h2>Recent Achievements 🏆</h2>
+            <div class="achievements-list">
+                {% for achievement in achievements %}
+                <div class="achievement-item">
+                    <span class="achievement-icon">🏆</span>
+                    <div>
+                        <h4>{{ achievement.title }}</h4>
+                        <p>{{ achievement.description }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if active_goals %}
+        <div class="dashboard-card">
+            <h2>Active Goals</h2>
+            <div class="goals-preview">
+                {% for goal in active_goals %}
+                <div class="goal-preview-item">
+                    <h4>{{ goal.goal_type|title }} Goal</h4>
+                    {% set progress = (goal.current_value / goal.target_value * 100) if goal.target_value else 0 %}
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: {{ [progress, 100]|min }}%"></div>
+                    </div>
+                    <p>{{ "%.1f"|format(goal.current_value) }} / {{ "%.1f"|format(goal.target_value) }} {{ goal.unit }}</p>
+                </div>
+                {% endfor %}
+            </div>
+            <a href="{{ url_for('goals') }}" class="btn btn-secondary">View All Goals</a>
+        </div>
+        {% endif %}
+
+        <div class="quick-actions">
+            <h2>Quick Actions</h2>
+            <div class="actions-grid">
+                <a href="{{ url_for('track_waste') }}" class="action-card">
+                    <div class="action-icon">➕</div>
+                    <h3>Add Waste Entry</h3>
+                </a>
+                <a href="{{ url_for('statistics') }}" class="action-card">
+                    <div class="action-icon">📊</div>
+                    <h3>Statistics</h3>
+                </a>
+                <a href="{{ url_for('recycling_centers') }}" class="action-card">
+                    <div class="action-icon">📍</div>
+                    <h3>Find Centers</h3>
+                </a>
+                <a href="{{ url_for('goals') }}" class="action-card">
+                    <div class="action-icon">🎯</div>
+                    <h3>Goals</h3>
+                </a>
+                <a href="{{ url_for('calculator') }}" class="action-card">
+                    <div class="action-icon">🧮</div>
+                    <h3>Calculator</h3>
+                </a>
+                <a href="{{ url_for('waste_tips') }}" class="action-card">
+                    <div class="action-icon">💡</div>
+                    <h3>Waste Tips</h3>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+

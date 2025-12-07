@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Notifications - Ecotrack{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="page-title">Notifications {% if unread_count > 0 %}<span class="badge-count">({{ unread_count }} new)</span>{% endif %}</h1>
+    
+    <div class="notifications-container">
+        {% if notifications %}
+            <div class="notifications-list">
+                {% for notification in notifications %}
+                <div class="notification-item {% if not notification.is_read %}notification-unread{% endif %}" data-id="{{ notification.id }}">
+                    <div class="notification-icon">
+                        {% if notification.notification_type == 'achievement' %}🏆
+                        {% elif notification.notification_type == 'reminder' %}⏰
+                        {% else %}ℹ️{% endif %}
+                    </div>
+                    <div class="notification-content">
+                        <h3>{{ notification.title }}</h3>
+                        <p>{{ notification.message }}</p>
+                        <span class="notification-time">{{ notification.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                    </div>
+                    {% if notification.link %}
+                    <div class="notification-action">
+                        <a href="{{ notification.link }}" class="btn btn-sm btn-secondary">View</a>
+                    </div>
+                    {% endif %}
+                    {% if not notification.is_read %}
+                    <button class="btn btn-sm btn-primary mark-read-btn" onclick="markAsRead({{ notification.id }})">Mark Read</button>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <p>No notifications yet.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function markAsRead(notificationId) {
+    fetch(`/notifications/${notificationId}/read`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const item = document.querySelector(`[data-id="${notificationId}"]`);
+            if (item) {
+                item.classList.remove('notification-unread');
+                const btn = item.querySelector('.mark-read-btn');
+                if (btn) btn.remove();
+            }
+        }
+    });
+}
+</script>
+{% endblock %}
+

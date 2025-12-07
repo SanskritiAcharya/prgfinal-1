@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Statistics - Ecotrack{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="page-title">Your Waste Statistics</h1>
+    
+    <div class="stats-overview">
+        <div class="stat-box">
+            <h3>{{ total_entries }}</h3>
+            <p>Total Entries</p>
+        </div>
+        <div class="stat-box">
+            <h3>{{ "%.2f"|format(total_weight) }} kg</h3>
+            <p>Total Waste</p>
+        </div>
+        <div class="stat-box">
+            <h3>{{ recycled_count }}</h3>
+            <p>Items Recycled</p>
+        </div>
+        <div class="stat-box">
+            <h3>{{ "%.2f"|format(recycled_weight) }} kg</h3>
+            <p>Recycled Weight</p>
+        </div>
+    </div>
+
+    <div class="charts-container">
+        <div class="chart-card">
+            <h2>Waste by Type</h2>
+            <canvas id="wasteTypeChart"></canvas>
+        </div>
+        
+        <div class="chart-card">
+            <h2>Monthly Waste Trend</h2>
+            <canvas id="monthlyChart"></canvas>
+        </div>
+    </div>
+
+    <div class="impact-section">
+        <h2>Environmental Impact</h2>
+        <div class="impact-grid">
+            <div class="impact-card">
+                <div class="impact-icon">🌱</div>
+                <h3>{{ "%.2f"|format(co2_saved) }} kg</h3>
+                <p>CO₂ Saved</p>
+            </div>
+            <div class="impact-card">
+                <div class="impact-icon">🌳</div>
+                <h3>{{ "%.1f"|format(trees_saved) }}</h3>
+                <p>Trees Saved</p>
+            </div>
+            <div class="impact-card">
+                <div class="impact-icon">♻️</div>
+                <h3>{{ ((recycled_count / total_entries * 100) if total_entries > 0 else 0)|round(1) }}%</h3>
+                <p>Recycling Rate</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="export-section">
+        <a href="{{ url_for('export_data') }}" class="btn btn-primary">📥 Export Data (CSV)</a>
+    </div>
+</div>
+
+<script>
+// Waste by Type Chart
+const wasteTypeData = {{ waste_by_type|tojson }};
+const typeLabels = Object.keys(wasteTypeData);
+const typeWeights = typeLabels.map(type => wasteTypeData[type].weight);
+
+const ctx1 = document.getElementById('wasteTypeChart').getContext('2d');
+new Chart(ctx1, {
+    type: 'doughnut',
+    data: {
+        labels: typeLabels.map(t => t.charAt(0).toUpperCase() + t.slice(1)),
+        datasets: [{
+            data: typeWeights,
+            backgroundColor: [
+                '#2ecc71',
+                '#3498db',
+                '#e74c3c',
+                '#95a5a6'
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true
+    }
+});
+
+// Monthly Trend Chart
+const monthlyData = {{ monthly_stats|tojson }};
+const monthLabels = Object.keys(monthlyData).sort();
+const monthWeights = monthLabels.map(month => monthlyData[month].weight);
+
+const ctx2 = document.getElementById('monthlyChart').getContext('2d');
+new Chart(ctx2, {
+    type: 'line',
+    data: {
+        labels: monthLabels,
+        datasets: [{
+            label: 'Waste (kg)',
+            data: monthWeights,
+            borderColor: '#2ecc71',
+            backgroundColor: 'rgba(46, 204, 113, 0.1)',
+            tension: 0.4,
+            fill: true
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+</script>
+{% endblock %}
+
