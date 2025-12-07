@@ -28,6 +28,15 @@
                     <label for="description">Description (Optional)</label>
                     <textarea id="description" name="description" rows="3" placeholder="Additional details about the waste..."></textarea>
                 </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="recycled" name="recycled" value="1">
+                        <span>This waste was recycled ♻️</span>
+                    </label>
+                    <small style="display: block; margin-top: 0.5rem; color: var(--text-light);">
+                        Check this if you recycled this waste item
+                    </small>
+                </div>
                 <button type="submit" class="btn btn-primary btn-block">Add Entry</button>
             </form>
         </div>
@@ -44,6 +53,7 @@
                                 <th>Weight (kg)</th>
                                 <th>Description</th>
                                 <th>Recycled</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -53,7 +63,24 @@
                                 <td><span class="badge badge-{{ entry.waste_type }}">{{ entry.waste_type|title }}</span></td>
                                 <td>{{ entry.weight_kg or 'N/A' }}</td>
                                 <td>{{ entry.description or '-' }}</td>
-                                <td>{{ '✓' if entry.recycled else '✗' }}</td>
+                                <td>
+                                    {% if entry.recycled %}
+                                        <span style="color: var(--success-color); font-weight: 600;">✓ Yes</span>
+                                    {% else %}
+                                        <span style="color: var(--text-light);">✗ No</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <form method="POST" action="{{ url_for('toggle_recycled', entry_id=entry.id) }}" style="display: inline;">
+                                        <button type="submit" class="btn btn-sm" style="padding: 0.3rem 0.8rem; font-size: 0.85rem;">
+                                            {% if entry.recycled %}
+                                                Mark as Not Recycled
+                                            {% else %}
+                                                Mark as Recycled
+                                            {% endif %}
+                                        </button>
+                                    </form>
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>

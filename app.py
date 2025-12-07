@@ -237,12 +237,18 @@ def track_waste():
         waste_type = request.form.get('waste_type')
         weight_kg = request.form.get('weight_kg', type=float)
         description = request.form.get('description', '')
+        recycled = bool(request.form.get('recycled'))
+        
+        # Auto-mark recyclable waste as recycled if not explicitly set
+        if waste_type == 'recyclable' and not recycled:
+            recycled = True
         
         entry = WasteEntry(
             user_id=current_user.id,
             waste_type=waste_type,
             weight_kg=weight_kg,
-            description=description
+            description=description,
+            recycled=recycled
         )
         db.session.add(entry)
         db.session.commit()
@@ -260,6 +266,27 @@ def track_waste():
         .order_by(WasteEntry.disposal_date.desc()).all()
     
     return render_template('track_waste.html', entries=entries)
+
+@app.route('/toggle-recycled/<int:entry_id>', methods=['POST'])
+@login_required
+def toggle_recycled(entry_id):
+    """Toggle recycled status of a waste entry"""
+    entry = WasteEntry.query.get_or_404(entry_id)
+    
+    # Ensure user owns this entry
+    if entry.user_id != current_user.id:
+        flash('Unauthorized action', 'error')
+        return redirect(url_for('track_waste'))
+    
+    entry.recycled = not entry.recycled
+    db.session.commit()
+    
+    # Update goals and achievements
+    check_and_create_achievements(current_user.id)
+    update_goals_progress(current_user.id)
+    
+    flash(f'Entry marked as {"recycled" if entry.recycled else "not recycled"}', 'success')
+    return redirect(url_for('track_waste'))
 
 @app.route('/recycling-centers')
 @login_required
@@ -354,10 +381,37 @@ def statistics():
         monthly_stats[month_key]['weight'] += entry.weight_kg or 0
     
     # Environmental impact (rough estimates)
-    # 1 kg of waste ≈ 0.5 kg CO2 equivalent
-    co2_saved = recycled_weight * 0.5
-    # Trees saved (1 ton recycled paper ≈ 17 trees)
-    trees_saved = (recycled_weight / 1000) * 17 if recycled_weight > 0 else 0
+    # Calculate CO2 saved based on waste type
+    co2_saved = 0
+    trees_saved = 0
+    
+    for entry in entries:
+        if entry.recycled and entry.weight_kg:
+            weight = entry.weight_kg
+            # Different waste types have different CO2 savings
+            if entry.waste_type == 'recyclable':
+                # Recyclable: 1 kg ≈ 0.6 kg CO2 saved
+                co2_saved += weight * 0.6
+                # Paper/plastic recycling saves trees
+                trees_saved += (weight / 1000) * 17
+            elif entry.waste_type == 'organic':
+                # Organic waste composting: 1 kg ≈ 0.3 kg CO2 saved
+                co2_saved += weight * 0.3
+            elif entry.waste_type == 'hazardous':
+                # Proper hazardous waste disposal: 1 kg ≈ 0.8 kg CO2 saved
+                co2_saved += weight * 0.8
+            else:
+                # Other waste: 1 kg ≈ 0.4 kg CO2 saved
+                co2_saved += weight * 0.4
+    
+    # Also calculate potential savings from recyclable waste (even if not marked recycled)
+    # This gives users an idea of what they could save
+    recyclable_entries = [e for e in entries if e.waste_type == 'recyclable' and not e.recycled and e.weight_kg]
+    potential_co2 = sum(e.weight_kg * 0.6 for e in recyclable_entries)
+    potential_trees = sum((e.weight_kg / 1000) * 17 for e in recyclable_entries)
+    
+    # Calculate recycling rate
+    recycling_rate = (recycled_count / total_entries * 100) if total_entries > 0 else 0
     
     return render_template('statistics.html',
                          total_entries=total_entries,
@@ -367,12 +421,18 @@ def statistics():
                          waste_by_type=waste_by_type,
                          monthly_stats=monthly_stats,
                          co2_saved=round(co2_saved, 2),
-                         trees_saved=round(trees_saved, 2))
+                         trees_saved=round(trees_saved, 2),
+                         recycling_rate=round(recycling_rate, 1),
+                         potential_co2=round(potential_co2, 2),
+                         potential_trees=round(potential_trees, 2))
 
 @app.route('/goals')
 @login_required
 def goals():
     """Waste reduction goals page"""
+    # Update all goals progress before displaying
+    update_goals_progress(current_user.id)
+    
     user_goals = WasteGoal.query.filter_by(user_id=current_user.id).order_by(WasteGoal.created_at.desc()).all()
     return render_template('goals.html', goals=user_goals)
 
@@ -392,12 +452,15 @@ def create_goal():
         except:
             pass
     
+    # Don't set start_date by default - this allows goals to count all entries
+    # Users can set a start date if they want to track from a specific date
     goal = WasteGoal(
         user_id=current_user.id,
         goal_type=goal_type,
         target_value=target_value,
         unit=unit,
-        end_date=end_date
+        end_date=end_date,
+        start_date=None  # Count all entries by default, not just from creation date
     )
     db.session.add(goal)
     db.session.commit()
@@ -816,40 +879,56 @@ def check_and_create_achievements(user_id):
 
 def update_goals_progress(user_id):
     """Update progress for user's waste reduction goals"""
-    goals = WasteGoal.query.filter_by(user_id=user_id, is_completed=False).all()
+    # Update ALL goals (both completed and not completed) to show accurate progress
+    goals = WasteGoal.query.filter_by(user_id=user_id).all()
     entries = WasteEntry.query.filter_by(user_id=user_id).all()
     
     for goal in goals:
+        was_completed = goal.is_completed
+        
         if goal.goal_type == 'reduce':
             # Calculate total waste in current period
+            # If start_date is set, count from that date; otherwise count all entries
             if goal.start_date:
                 period_entries = [e for e in entries if e.disposal_date >= goal.start_date]
-                if goal.end_date:
-                    period_entries = [e for e in period_entries if e.disposal_date <= goal.end_date]
-                current_value = sum(e.weight_kg or 0 for e in period_entries)
-                goal.current_value = current_value
-                
-                # Check if goal is completed (reduced waste)
-                if current_value <= goal.target_value:
-                    goal.is_completed = True
-                    create_notification(user_id, 'Goal Achieved!', 
-                                     f'You achieved your goal to reduce waste to {goal.target_value} {goal.unit}!',
-                                     'achievement', '/goals')
+            else:
+                period_entries = entries
+            
+            if goal.end_date:
+                period_entries = [e for e in period_entries if e.disposal_date <= goal.end_date]
+            
+            current_value = sum(e.weight_kg or 0 for e in period_entries)
+            goal.current_value = current_value
+            
+            # Check if goal is completed (reduced waste)
+            if current_value <= goal.target_value and not was_completed:
+                goal.is_completed = True
+                create_notification(user_id, 'Goal Achieved!', 
+                                 f'You achieved your goal to reduce waste to {goal.target_value} {goal.unit}!',
+                                 'achievement', '/goals')
+            elif current_value > goal.target_value and was_completed:
+                # Goal was completed but now exceeded - mark as not completed
+                goal.is_completed = False
         
         elif goal.goal_type == 'recycle':
             # Count recycled items
+            # If start_date is set, count from that date; otherwise count all entries
             recycled_entries = [e for e in entries if e.recycled]
+            
             if goal.start_date:
                 recycled_entries = [e for e in recycled_entries if e.disposal_date >= goal.start_date]
+            
             if goal.end_date:
                 recycled_entries = [e for e in recycled_entries if e.disposal_date <= goal.end_date]
             
             if goal.unit == 'count':
-                goal.current_value = len(recycled_entries)
+                current_value = len(recycled_entries)
             else:
-                goal.current_value = sum(e.weight_kg or 0 for e in recycled_entries)
+                current_value = sum(e.weight_kg or 0 for e in recycled_entries)
             
-            if goal.current_value >= goal.target_value:
+            goal.current_value = current_value
+            
+            if current_value >= goal.target_value and not was_completed:
                 goal.is_completed = True
                 create_notification(user_id, 'Goal Achieved!',
                                  f'You achieved your recycling goal of {goal.target_value} {goal.unit}!',
@@ -857,13 +936,19 @@ def update_goals_progress(user_id):
         
         elif goal.goal_type == 'track':
             # Count total entries
+            # If start_date is set, count from that date; otherwise count all entries
             if goal.start_date:
                 period_entries = [e for e in entries if e.disposal_date >= goal.start_date]
             else:
                 period_entries = entries
-            goal.current_value = len(period_entries)
             
-            if goal.current_value >= goal.target_value:
+            if goal.end_date:
+                period_entries = [e for e in period_entries if e.disposal_date <= goal.end_date]
+            
+            current_value = len(period_entries)
+            goal.current_value = current_value
+            
+            if current_value >= goal.target_value and not was_completed:
                 goal.is_completed = True
                 create_notification(user_id, 'Goal Achieved!',
                                  f'You tracked {goal.target_value} waste entries!',

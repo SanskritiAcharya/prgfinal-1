@@ -48,18 +48,44 @@
                 <div class="impact-icon">🌱</div>
                 <h3>{{ "%.2f"|format(co2_saved) }} kg</h3>
                 <p>CO₂ Saved</p>
+                {% if potential_co2 > 0 %}
+                <small style="color: var(--text-light); margin-top: 0.5rem; display: block;">
+                    Potential: +{{ "%.2f"|format(potential_co2) }} kg
+                </small>
+                {% endif %}
             </div>
             <div class="impact-card">
                 <div class="impact-icon">🌳</div>
                 <h3>{{ "%.1f"|format(trees_saved) }}</h3>
                 <p>Trees Saved</p>
+                {% if potential_trees > 0 %}
+                <small style="color: var(--text-light); margin-top: 0.5rem; display: block;">
+                    Potential: +{{ "%.1f"|format(potential_trees) }}
+                </small>
+                {% endif %}
             </div>
             <div class="impact-card">
                 <div class="impact-icon">♻️</div>
-                <h3>{{ ((recycled_count / total_entries * 100) if total_entries > 0 else 0)|round(1) }}%</h3>
+                <h3>{{ recycling_rate }}%</h3>
                 <p>Recycling Rate</p>
+                {% if recycling_rate < 50 and total_entries > 0 %}
+                <small style="color: var(--text-light); margin-top: 0.5rem; display: block;">
+                    Keep recycling! 🌍
+                </small>
+                {% endif %}
             </div>
         </div>
+        {% if potential_co2 > 0 or potential_trees > 0 %}
+        <div class="potential-impact" style="margin-top: 2rem; padding: 1.5rem; background: var(--light-bg); border-radius: 12px; border-left: 4px solid var(--warning-color);">
+            <h3 style="margin-bottom: 0.5rem; color: var(--dark-color);">💡 Potential Impact</h3>
+            <p style="color: var(--text-color); margin-bottom: 0.5rem;">
+                You have recyclable items that haven't been marked as recycled yet.
+            </p>
+            <p style="color: var(--text-light); font-size: 0.9rem;">
+                Mark them as recycled in the "Track Waste" page to see your full environmental impact! Every item counts. 🌱
+            </p>
+        </div>
+        {% endif %}
     </div>
 
     <div class="export-section">
@@ -125,4 +151,5 @@ new Chart(ctx2, {
 });
 </script>
 {% endblock %}
+
 
