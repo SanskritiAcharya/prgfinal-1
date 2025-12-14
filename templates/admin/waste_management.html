@@ -1,0 +1,196 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Waste Management - Admin{% endblock %}
+
+{% block extra_head %}
+<style>
+    .filter-section {
+        background: var(--card-bg, #ffffff);
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+    }
+    
+    .filter-form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        align-items: end;
+    }
+    
+    .waste-entries-table {
+        background: var(--card-bg, #ffffff);
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        overflow-x: auto;
+    }
+    
+    .waste-entries-table table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .waste-entries-table th,
+    .waste-entries-table td {
+        padding: 1rem;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color, #e0e0e0);
+    }
+    
+    .waste-entries-table th {
+        background: var(--bg-light, #f8f9fa);
+        font-weight: 600;
+        color: var(--text-primary, #333);
+        position: sticky;
+        top: 0;
+    }
+    
+    .waste-entries-table tr:hover {
+        background: var(--bg-light, #f8f9fa);
+    }
+    
+    .status-select {
+        padding: 0.5rem;
+        border-radius: 6px;
+        border: 1px solid var(--border-color, #e0e0e0);
+        font-size: 0.9rem;
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    
+    .badge-new {
+        background: #e3f2fd;
+        color: #1976d2;
+    }
+    
+    .badge-waiting {
+        background: #fff3e0;
+        color: #e65100;
+    }
+    
+    .badge-disposed {
+        background: #e8f5e9;
+        color: #2e7d32;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    
+    .btn-sm {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.85rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="page-title">🗑️ Waste Management</h1>
+    
+    <div class="filter-section">
+        <h3 style="margin-top: 0;">Filter Waste Entries</h3>
+        <form method="GET" action="{{ url_for('admin_waste_management') }}" class="filter-form">
+            <div class="form-group">
+                <label for="status">Status</label>
+                <select id="status" name="status" class="status-select">
+                    <option value="all" {% if current_status == 'all' %}selected{% endif %}>All Statuses</option>
+                    <option value="new" {% if current_status == 'new' %}selected{% endif %}>New</option>
+                    <option value="waiting" {% if current_status == 'waiting' %}selected{% endif %}>Waiting</option>
+                    <option value="disposed" {% if current_status == 'disposed' %}selected{% endif %}>Disposed</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="waste_type">Waste Type</label>
+                <select id="waste_type" name="waste_type" class="status-select">
+                    <option value="all" {% if current_waste_type == 'all' %}selected{% endif %}>All Types</option>
+                    <option value="organic" {% if current_waste_type == 'organic' %}selected{% endif %}>Organic</option>
+                    <option value="recyclable" {% if current_waste_type == 'recyclable' %}selected{% endif %}>Recyclable</option>
+                    <option value="hazardous" {% if current_waste_type == 'hazardous' %}selected{% endif %}>Hazardous</option>
+                    <option value="other" {% if current_waste_type == 'other' %}selected{% endif %}>Other</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary">Apply Filters</button>
+                <a href="{{ url_for('admin_waste_management') }}" class="btn btn-secondary">Clear</a>
+            </div>
+        </form>
+    </div>
+    
+    <div class="waste-entries-table">
+        <h3 style="margin-top: 0;">Waste Entries ({{ entries|length }} found)</h3>
+        {% if entries %}
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>User</th>
+                    <th>Type</th>
+                    <th>Weight (kg)</th>
+                    <th>Description</th>
+                    <th>Current Status</th>
+                    <th>Date</th>
+                    <th>Last Updated</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in entries %}
+                <tr>
+                    <td>#{{ entry.id }}</td>
+                    <td>{{ entry.user.username }}</td>
+                    <td>{{ entry.waste_type|title }}</td>
+                    <td>{{ entry.weight_kg or 'N/A' }}</td>
+                    <td>{{ entry.description[:50] + '...' if entry.description and entry.description|length > 50 else (entry.description or '-') }}</td>
+                    <td>
+                        <span class="status-badge badge-{{ entry.status }}">
+                            {{ entry.status|title }}
+                        </span>
+                    </td>
+                    <td>{{ entry.disposal_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td>
+                        {% if entry.status_updated_at %}
+                            {{ entry.status_updated_at.strftime('%Y-%m-%d %H:%M') }}
+                            {% if entry.status_updater %}
+                                <br><small>by {{ entry.status_updater.username }}</small>
+                            {% endif %}
+                        {% else %}
+                            <small style="color: var(--text-light, #999);">Never</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <form method="POST" action="{{ url_for('admin_update_waste_status', entry_id=entry.id) }}" style="display: inline;">
+                            <select name="status" class="status-select" style="margin-right: 0.5rem;">
+                                <option value="new" {% if entry.status == 'new' %}selected{% endif %}>New</option>
+                                <option value="waiting" {% if entry.status == 'waiting' %}selected{% endif %}>Waiting</option>
+                                <option value="disposed" {% if entry.status == 'disposed' %}selected{% endif %}>Disposed</option>
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-primary">Update</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="text-align: center; padding: 2rem; color: var(--text-light, #999);">
+            No waste entries found matching the filters.
+        </p>
+        {% endif %}
+    </div>
+    
+    <div style="margin-top: 2rem;">
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">← Back to Admin Dashboard</a>
+    </div>
+</div>
+{% endblock %}

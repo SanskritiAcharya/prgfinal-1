@@ -1,0 +1,238 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Admin Dashboard - Ecotrack{% endblock %}
+
+{% block extra_head %}
+<style>
+    .admin-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin: 2rem 0;
+    }
+    
+    .stat-card {
+        background: var(--card-bg, #ffffff);
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border-left: 4px solid;
+    }
+    
+    .stat-card.new {
+        border-left-color: #3498db;
+    }
+    
+    .stat-card.waiting {
+        border-left-color: #f39c12;
+    }
+    
+    .stat-card.disposed {
+        border-left-color: #27ae60;
+    }
+    
+    .stat-card.total {
+        border-left-color: #9b59b6;
+    }
+    
+    .stat-card.users {
+        border-left-color: #e74c3c;
+    }
+    
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--text-primary, #333);
+        margin: 0.5rem 0;
+    }
+    
+    .stat-label {
+        font-size: 0.9rem;
+        color: var(--text-secondary, #666);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .admin-actions {
+        display: flex;
+        gap: 1rem;
+        margin: 2rem 0;
+        flex-wrap: wrap;
+    }
+    
+    .admin-section {
+        background: var(--card-bg, #ffffff);
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin: 2rem 0;
+    }
+    
+    .admin-section h3 {
+        margin-top: 0;
+        color: var(--text-primary, #333);
+        border-bottom: 2px solid var(--border-color, #e0e0e0);
+        padding-bottom: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .waste-type-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+    
+    .waste-type-item {
+        padding: 1rem;
+        background: var(--bg-light, #f8f9fa);
+        border-radius: 8px;
+        text-align: center;
+    }
+    
+    .waste-type-item strong {
+        display: block;
+        font-size: 1.2rem;
+        color: var(--text-primary, #333);
+        margin-bottom: 0.5rem;
+    }
+    
+    .recent-entries-table {
+        overflow-x: auto;
+    }
+    
+    .recent-entries-table table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .recent-entries-table th,
+    .recent-entries-table td {
+        padding: 0.75rem;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color, #e0e0e0);
+    }
+    
+    .recent-entries-table th {
+        background: var(--bg-light, #f8f9fa);
+        font-weight: 600;
+        color: var(--text-primary, #333);
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    
+    .badge-new {
+        background: #e3f2fd;
+        color: #1976d2;
+    }
+    
+    .badge-waiting {
+        background: #fff3e0;
+        color: #e65100;
+    }
+    
+    .badge-disposed {
+        background: #e8f5e9;
+        color: #2e7d32;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="page-title">🔐 Admin Dashboard</h1>
+    
+    <div class="admin-stats-grid">
+        <div class="stat-card new">
+            <div class="stat-label">New Waste</div>
+            <div class="stat-value">{{ new_waste }}</div>
+            <small>Awaiting action</small>
+        </div>
+        
+        <div class="stat-card waiting">
+            <div class="stat-label">Waiting Waste</div>
+            <div class="stat-value">{{ waiting_waste }}</div>
+            <small>Scheduled/Pending</small>
+        </div>
+        
+        <div class="stat-card disposed">
+            <div class="stat-label">Disposed Waste</div>
+            <div class="stat-value">{{ disposed_waste }}</div>
+            <small>Completed</small>
+        </div>
+        
+        <div class="stat-card total">
+            <div class="stat-label">Total Waste Entries</div>
+            <div class="stat-value">{{ total_waste }}</div>
+            <small>All time</small>
+        </div>
+        
+    </div>
+    
+    <div class="admin-actions">
+        <a href="{{ url_for('admin_waste_management') }}" class="btn btn-primary" style="font-size: 1.1rem; padding: 1rem 2rem;">
+            🗑️ Manage Waste Entries
+        </a>
+    </div>
+    
+    <div class="admin-section">
+        <h3>Waste Statistics by Type</h3>
+        <div class="waste-type-stats">
+            {% for waste_type, stats in waste_by_type.items() %}
+            <div class="waste-type-item">
+                <strong>{{ waste_type|title }}</strong>
+                <div>Entries: {{ stats.count }}</div>
+                <div>Weight: {{ "%.2f"|format(stats.weight) }} kg</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <div class="admin-section">
+        <h3>Recent Waste Entries</h3>
+        <p style="color: var(--text-secondary, #666); margin-bottom: 1rem;">
+            Click on "Manage Waste Entries" above to view all entries and update their status.
+        </p>
+        <div class="recent-entries-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>User</th>
+                        <th>Type</th>
+                        <th>Weight (kg)</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in recent_entries %}
+                    <tr>
+                        <td>#{{ entry.id }}</td>
+                        <td>{{ entry.user.username }}</td>
+                        <td>{{ entry.waste_type|title }}</td>
+                        <td>{{ entry.weight_kg or 'N/A' }}</td>
+                        <td>
+                            <span class="status-badge badge-{{ entry.status }}">
+                                {{ entry.status|title }}
+                            </span>
+                        </td>
+                        <td>{{ entry.disposal_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>
+                            <a href="{{ url_for('admin_waste_management') }}?status=all#entry-{{ entry.id }}" class="btn btn-sm btn-primary">Manage</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

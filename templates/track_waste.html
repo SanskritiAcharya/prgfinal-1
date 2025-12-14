@@ -2,6 +2,194 @@
 
 {% block title %}Track Waste - Ecotrack{% endblock %}
 
+{% block extra_head %}
+<style>
+    .waste-lifecycle {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 2rem;
+        margin: 2rem 0;
+    }
+    
+    .lifecycle-stage {
+        background: var(--card-bg, #ffffff);
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border-top: 4px solid;
+    }
+    
+    .stage-new {
+        border-top-color: #3498db;
+    }
+    
+    .stage-waiting {
+        border-top-color: #f39c12;
+    }
+    
+    .stage-disposed {
+        border-top-color: #27ae60;
+    }
+    
+    .stage-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid var(--border-color, #e0e0e0);
+    }
+    
+    .stage-title {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: var(--text-primary, #333);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .stage-count {
+        background: var(--primary-color, #3498db);
+        color: white;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+    
+    .stage-new .stage-count {
+        background: #3498db;
+    }
+    
+    .stage-waiting .stage-count {
+        background: #f39c12;
+    }
+    
+    .stage-disposed .stage-count {
+        background: #27ae60;
+    }
+    
+    .waste-entry-card {
+        background: var(--bg-light, #f8f9fa);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-left: 3px solid;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .waste-entry-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .entry-new {
+        border-left-color: #3498db;
+    }
+    
+    .entry-waiting {
+        border-left-color: #f39c12;
+    }
+    
+    .entry-disposed {
+        border-left-color: #27ae60;
+    }
+    
+    .entry-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 0.5rem;
+    }
+    
+    .entry-type {
+        font-weight: 600;
+        color: var(--text-primary, #333);
+    }
+    
+    .entry-date {
+        font-size: 0.85rem;
+        color: var(--text-light, #666);
+    }
+    
+    .entry-details {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        color: var(--text-secondary, #555);
+        margin-top: 0.5rem;
+    }
+    
+    .entry-details strong {
+        color: var(--text-primary, #333);
+    }
+    
+    .entry-status-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        margin-top: 0.5rem;
+    }
+    
+    .badge-new {
+        background: #e3f2fd;
+        color: #1976d2;
+    }
+    
+    .badge-waiting {
+        background: #fff3e0;
+        color: #e65100;
+    }
+    
+    .badge-disposed {
+        background: #e8f5e9;
+        color: #2e7d32;
+    }
+    
+    .status-update-info {
+        font-size: 0.8rem;
+        color: var(--text-light, #666);
+        margin-top: 0.5rem;
+        font-style: italic;
+    }
+    
+    .empty-stage {
+        text-align: center;
+        padding: 2rem;
+        color: var(--text-light, #999);
+        font-style: italic;
+    }
+    
+    .lifecycle-arrow {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        color: var(--text-light, #ccc);
+        margin: 0 0.5rem;
+    }
+    
+    @media (max-width: 768px) {
+        .waste-lifecycle {
+            grid-template-columns: 1fr;
+        }
+        
+        .lifecycle-arrow {
+            transform: rotate(90deg);
+            margin: 0.5rem 0;
+        }
+    }
+    
+    .tracking-form-card {
+        margin-bottom: 2rem;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container">
     <h1 class="page-title">Track Your Waste</h1>
@@ -41,56 +229,137 @@
             </form>
         </div>
 
-        <div class="entries-list-card">
-            <h2>Your Waste Entries</h2>
-            {% if entries %}
-                <div class="entries-table">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Type</th>
-                                <th>Weight (kg)</th>
-                                <th>Description</th>
-                                <th>Recycled</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for entry in entries %}
-                            <tr>
-                                <td>{{ entry.disposal_date.strftime('%Y-%m-%d') }}</td>
-                                <td><span class="badge badge-{{ entry.waste_type }}">{{ entry.waste_type|title }}</span></td>
-                                <td>{{ entry.weight_kg or 'N/A' }}</td>
-                                <td>{{ entry.description or '-' }}</td>
-                                <td>
-                                    {% if entry.recycled %}
-                                        <span style="color: var(--success-color); font-weight: 600;">✓ Yes</span>
-                                    {% else %}
-                                        <span style="color: var(--text-light);">✗ No</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <form method="POST" action="{{ url_for('toggle_recycled', entry_id=entry.id) }}" style="display: inline;">
-                                        <button type="submit" class="btn btn-sm" style="padding: 0.3rem 0.8rem; font-size: 0.85rem;">
-                                            {% if entry.recycled %}
-                                                Mark as Not Recycled
-                                            {% else %}
-                                                Mark as Recycled
-                                            {% endif %}
-                                        </button>
-                                    </form>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+        <div class="waste-lifecycle-container">
+            <h2 style="margin-bottom: 1.5rem; text-align: center;">Waste Lifecycle Tracking</h2>
+            <p style="text-align: center; color: var(--text-secondary, #666); margin-bottom: 2rem;">
+                Track your waste as it moves through different stages: <strong>New Waste</strong> → <strong>Waiting Waste</strong> → <strong>Disposed Waste</strong>
+            </p>
+            
+            <div class="waste-lifecycle">
+                <!-- New Waste Stage -->
+                <div class="lifecycle-stage stage-new">
+                    <div class="stage-header">
+                        <div class="stage-title">
+                            <span>🆕</span>
+                            <span>New Waste</span>
+                        </div>
+                        <span class="stage-count">{{ new_entries|length }}</span>
+                    </div>
+                    <p style="font-size: 0.9rem; color: var(--text-secondary, #666); margin-bottom: 1rem;">
+                        Recently logged waste entries awaiting action
+                    </p>
+                    {% if new_entries %}
+                        {% for entry in new_entries %}
+                        <div class="waste-entry-card entry-new">
+                            <div class="entry-header">
+                                <span class="entry-type">{{ entry.waste_type|title }}</span>
+                                <span class="entry-date">{{ entry.disposal_date.strftime('%Y-%m-%d %H:%M') }}</span>
+                            </div>
+                            <div class="entry-details">
+                                <strong>Weight:</strong> <span>{{ entry.weight_kg or 'N/A' }} kg</span>
+                                {% if entry.description %}
+                                <strong>Description:</strong> <span>{{ entry.description }}</span>
+                                {% endif %}
+                                <strong>Recycled:</strong> <span>{{ 'Yes' if entry.recycled else 'No' }}</span>
+                            </div>
+                            <span class="entry-status-badge badge-new">Status: New</span>
+                            {% if entry.status_updated_at %}
+                            <div class="status-update-info">
+                                Last updated: {{ entry.status_updated_at.strftime('%Y-%m-%d %H:%M') }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-stage">No new waste entries</div>
+                    {% endif %}
                 </div>
-            {% else %}
-                <p class="empty-state">No waste entries yet. Start tracking your waste disposal!</p>
-            {% endif %}
+
+                <!-- Waiting Waste Stage -->
+                <div class="lifecycle-stage stage-waiting">
+                    <div class="stage-header">
+                        <div class="stage-title">
+                            <span>⏳</span>
+                            <span>Waiting Waste</span>
+                        </div>
+                        <span class="stage-count">{{ waiting_entries|length }}</span>
+                    </div>
+                    <p style="font-size: 0.9rem; color: var(--text-secondary, #666); margin-bottom: 1rem;">
+                        Waste that has been scheduled or is pending collection/processing
+                    </p>
+                    {% if waiting_entries %}
+                        {% for entry in waiting_entries %}
+                        <div class="waste-entry-card entry-waiting">
+                            <div class="entry-header">
+                                <span class="entry-type">{{ entry.waste_type|title }}</span>
+                                <span class="entry-date">{{ entry.disposal_date.strftime('%Y-%m-%d %H:%M') }}</span>
+                            </div>
+                            <div class="entry-details">
+                                <strong>Weight:</strong> <span>{{ entry.weight_kg or 'N/A' }} kg</span>
+                                {% if entry.description %}
+                                <strong>Description:</strong> <span>{{ entry.description }}</span>
+                                {% endif %}
+                                <strong>Recycled:</strong> <span>{{ 'Yes' if entry.recycled else 'No' }}</span>
+                            </div>
+                            <span class="entry-status-badge badge-waiting">Status: Waiting</span>
+                            {% if entry.status_updated_at %}
+                            <div class="status-update-info">
+                                Updated: {{ entry.status_updated_at.strftime('%Y-%m-%d %H:%M') }}
+                                {% if entry.status_updater %}
+                                by {{ entry.status_updater.username }}
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-stage">No waiting waste entries</div>
+                    {% endif %}
+                </div>
+
+                <!-- Disposed Waste Stage -->
+                <div class="lifecycle-stage stage-disposed">
+                    <div class="stage-header">
+                        <div class="stage-title">
+                            <span>✅</span>
+                            <span>Disposed Waste</span>
+                        </div>
+                        <span class="stage-count">{{ disposed_entries|length }}</span>
+                    </div>
+                    <p style="font-size: 0.9rem; color: var(--text-secondary, #666); margin-bottom: 1rem;">
+                        Waste that has been successfully collected and disposed or recycled
+                    </p>
+                    {% if disposed_entries %}
+                        {% for entry in disposed_entries %}
+                        <div class="waste-entry-card entry-disposed">
+                            <div class="entry-header">
+                                <span class="entry-type">{{ entry.waste_type|title }}</span>
+                                <span class="entry-date">{{ entry.disposal_date.strftime('%Y-%m-%d %H:%M') }}</span>
+                            </div>
+                            <div class="entry-details">
+                                <strong>Weight:</strong> <span>{{ entry.weight_kg or 'N/A' }} kg</span>
+                                {% if entry.description %}
+                                <strong>Description:</strong> <span>{{ entry.description }}</span>
+                                {% endif %}
+                                <strong>Recycled:</strong> <span>{{ 'Yes' if entry.recycled else 'No' }}</span>
+                            </div>
+                            <span class="entry-status-badge badge-disposed">Status: Disposed</span>
+                            {% if entry.status_updated_at %}
+                            <div class="status-update-info">
+                                Completed: {{ entry.status_updated_at.strftime('%Y-%m-%d %H:%M') }}
+                                {% if entry.status_updater %}
+                                by {{ entry.status_updater.username }}
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-stage">No disposed waste entries</div>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
 </div>
 {% endblock %}
-

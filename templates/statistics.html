@@ -36,8 +36,8 @@
         </div>
         
         <div class="chart-card">
-            <h2>Monthly Waste Trend</h2>
-            <canvas id="monthlyChart"></canvas>
+            <h2>Weekly Waste Trend</h2>
+            <canvas id="weeklyChart" style="max-height: 400px;"></canvas>
         </div>
     </div>
 
@@ -94,58 +94,147 @@
 </div>
 
 <script>
-// Waste by Type Chart
-const wasteTypeData = {{ waste_by_type|tojson }};
-const typeLabels = Object.keys(wasteTypeData);
-const typeWeights = typeLabels.map(type => wasteTypeData[type].weight);
+// Wait for DOM to be fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Waste by Type Chart
+    const wasteTypeData = {{ waste_by_type|tojson }};
+    const typeLabels = Object.keys(wasteTypeData);
+    const typeWeights = typeLabels.map(type => wasteTypeData[type].weight || 0);
 
-const ctx1 = document.getElementById('wasteTypeChart').getContext('2d');
-new Chart(ctx1, {
-    type: 'doughnut',
-    data: {
-        labels: typeLabels.map(t => t.charAt(0).toUpperCase() + t.slice(1)),
-        datasets: [{
-            data: typeWeights,
-            backgroundColor: [
-                '#2ecc71',
-                '#3498db',
-                '#e74c3c',
-                '#95a5a6'
-            ]
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: true
-    }
-});
-
-// Monthly Trend Chart
-const monthlyData = {{ monthly_stats|tojson }};
-const monthLabels = Object.keys(monthlyData).sort();
-const monthWeights = monthLabels.map(month => monthlyData[month].weight);
-
-const ctx2 = document.getElementById('monthlyChart').getContext('2d');
-new Chart(ctx2, {
-    type: 'line',
-    data: {
-        labels: monthLabels,
-        datasets: [{
-            label: 'Waste (kg)',
-            data: monthWeights,
-            borderColor: '#2ecc71',
-            backgroundColor: 'rgba(46, 204, 113, 0.1)',
-            tension: 0.4,
-            fill: true
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        scales: {
-            y: {
-                beginAtZero: true
+    const ctx1 = document.getElementById('wasteTypeChart');
+    if (ctx1 && typeWeights.some(w => w > 0)) {
+        new Chart(ctx1.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: typeLabels.map(t => t.charAt(0).toUpperCase() + t.slice(1)),
+                datasets: [{
+                    data: typeWeights,
+                    backgroundColor: [
+                        '#2ecc71',
+                        '#3498db',
+                        '#e74c3c',
+                        '#95a5a6'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true
             }
+        });
+    }
+
+    // Weekly Waste Trend Chart
+    const weeklyData = {{ weekly_stats|tojson }};
+    const weekKeys = Object.keys(weeklyData).sort();
+    
+    // Format week labels (e.g., "2024-W01" -> "Week 1, 2024" or just show date range)
+    const weekLabels = weekKeys.map(key => {
+        // If format is YYYY-WW, extract week number
+        if (key.includes('-W')) {
+            const [year, week] = key.split('-W');
+            return `Week ${week}, ${year}`;
+        }
+        // If format is YYYY-MM-DD (start of week), format it
+        if (key.includes('-')) {
+            const parts = key.split('-');
+            if (parts.length === 3) {
+                const date = new Date(parts[0], parts[1] - 1, parts[2]);
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }
+        }
+        return key;
+    });
+    
+    const weekCounts = weekKeys.map(week => weeklyData[week].count || 0);
+    const weekWeights = weekKeys.map(week => weeklyData[week].weight || 0);
+
+    const ctx2 = document.getElementById('weeklyChart');
+    if (ctx2) {
+        if (weekKeys.length > 0 && (weekCounts.some(c => c > 0) || weekWeights.some(w => w > 0))) {
+            new Chart(ctx2.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: weekLabels,
+                    datasets: [
+                        {
+                            label: 'Number of Entries',
+                            data: weekCounts,
+                            backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                            borderColor: '#3498db',
+                            borderWidth: 2,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Total Weight (kg)',
+                            data: weekWeights,
+                            backgroundColor: 'rgba(46, 204, 113, 0.7)',
+                            borderColor: '#2ecc71',
+                            borderWidth: 2,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.datasetIndex === 0) {
+                                        label += context.parsed.y + ' entries';
+                                    } else {
+                                        label += context.parsed.y.toFixed(2) + ' kg';
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Entries'
+                            },
+                            ticks: {
+                                stepSize: 1
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Weight (kg)'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    }
+                }
+            });
+        } else {
+            // Show message if no data
+            ctx2.parentElement.innerHTML = '<h2>Weekly Waste Trend</h2><p style="text-align: center; padding: 2rem; color: #666;">No weekly data available yet. Start tracking your waste to see weekly trends!</p>';
         }
     }
 });

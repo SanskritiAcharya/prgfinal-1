@@ -16,19 +16,36 @@
                 </div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon">♻️</div>
+                <div class="stat-icon">🆕</div>
                 <div class="stat-info">
-                    <h3>{{ recycled_count }}</h3>
-                    <p>Items Recycled</p>
+                    <h3>{{ new_count }}</h3>
+                    <p>New Waste</p>
                 </div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon">📍</div>
+                <div class="stat-icon">⏳</div>
                 <div class="stat-info">
-                    <h3>{{ nearby_centers|length }}</h3>
-                    <p>Nearby Centers</p>
+                    <h3>{{ waiting_count }}</h3>
+                    <p>Waiting</p>
                 </div>
             </div>
+            <div class="stat-card">
+                <div class="stat-icon">✅</div>
+                <div class="stat-info">
+                    <h3>{{ disposed_count }}</h3>
+                    <p>Disposed</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="dashboard-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin: 2rem 0;">
+            <h2 style="color: white; margin-top: 0;">🗑️ Track Your Waste</h2>
+            <p style="font-size: 1.1rem; margin-bottom: 1.5rem;">
+                Monitor your waste as it moves through the collection process. Admin will update the status as your waste is processed.
+            </p>
+            <a href="{{ url_for('track_waste') }}" class="btn" style="background: white; color: #667eea; font-weight: 600; padding: 0.8rem 2rem;">
+                View Waste Tracking →
+            </a>
         </div>
 
         <div class="dashboard-grid">

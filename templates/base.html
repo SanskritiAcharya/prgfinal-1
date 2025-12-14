@@ -24,6 +24,9 @@
                     <li><a href="{{ url_for('goals') }}">Goals</a></li>
                     <li><a href="{{ url_for('notifications_page') }}">Notifications <span id="notificationBadge" class="badge-notification" style="display:none;">!</span></a></li>
                     <li><a href="{{ url_for('waste_tips') }}">Tips</a></li>
+                    {% if current_user.is_admin %}
+                    <li><a href="{{ url_for('admin_dashboard') }}" style="color: #e74c3c; font-weight: 600;">🔐 Admin</a></li>
+                    {% endif %}
                     <li><a href="{{ url_for('logout') }}">Logout</a></li>
                 {% else %}
                     <li><a href="{{ url_for('index') }}">Home</a></li>

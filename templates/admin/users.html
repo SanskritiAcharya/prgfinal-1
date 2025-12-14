@@ -1,0 +1,99 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Users Management - Admin{% endblock %}
+
+{% block extra_head %}
+<style>
+    .users-table {
+        background: var(--card-bg, #ffffff);
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        overflow-x: auto;
+    }
+    
+    .users-table table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .users-table th,
+    .users-table td {
+        padding: 1rem;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color, #e0e0e0);
+    }
+    
+    .users-table th {
+        background: var(--bg-light, #f8f9fa);
+        font-weight: 600;
+        color: var(--text-primary, #333);
+    }
+    
+    .users-table tr:hover {
+        background: var(--bg-light, #f8f9fa);
+    }
+    
+    .admin-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        background: #e3f2fd;
+        color: #1976d2;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="page-title">👥 Users Management</h1>
+    
+    <div class="users-table">
+        <h3 style="margin-top: 0;">All Registered Users ({{ users|length }})</h3>
+        {% if users %}
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>City</th>
+                    <th>Role</th>
+                    <th>Waste Entries</th>
+                    <th>Joined</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>#{{ user.id }}</td>
+                    <td>{{ user.username }}</td>
+                    <td>{{ user.email }}</td>
+                    <td>{{ user.city or 'N/A' }}</td>
+                    <td>
+                        {% if user.is_admin %}
+                            <span class="admin-badge">Admin</span>
+                        {% else %}
+                            <span style="color: var(--text-light, #999);">User</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ user.waste_entries|length }}</td>
+                    <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="text-align: center; padding: 2rem; color: var(--text-light, #999);">
+            No users found.
+        </p>
+        {% endif %}
+    </div>
+    
+    <div style="margin-top: 2rem;">
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">← Back to Admin Dashboard</a>
+    </div>
+</div>
+{% endblock %}

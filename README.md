@@ -6,7 +6,7 @@ Ecotrack is a Flask-based web application designed to help users in Nepal track 
 
 - **User Authentication & Session Management**: Secure user registration, login, and session handling
 - **Waste Tracking**: Track household waste entries with type, weight, and description
-- **Recycling Centers**: Interactive map showing nearby recycling centers with Google Maps integration
+- **Recycling Centers**: Interactive map showing nearby recycling centers with Leaflet.js integration
 - **Pickup Schedules**: View waste collection schedules by area
 - **Waste Tips**: Educational content on proper waste segregation and disposal
 - **Real-time Chat**: Socket.IO powered chatbot assistant for waste management queries
@@ -19,7 +19,7 @@ Ecotrack is a Flask-based web application designed to help users in Nepal track 
 - **Database**: SQLAlchemy (SQLite)
 - **Authentication**: Flask-Login
 - **Real-time Communication**: Flask-SocketIO
-- **Maps**: Google Maps API
+- **Maps**: Leaflet.js with OpenStreetMap
 - **Frontend**: HTML5, CSS3, JavaScript
 - **Styling**: Modern responsive design with custom CSS
 
@@ -29,7 +29,7 @@ Ecotrack is a Flask-based web application designed to help users in Nepal track 
 
 - Python 3.8 or higher
 - pip (Python package manager)
-- Google Maps API Key (optional, for map functionality)
+- No API keys required (uses free OpenStreetMap services)
 
 ### Setup Instructions
 
@@ -52,14 +52,12 @@ Ecotrack is a Flask-based web application designed to help users in Nepal track 
 4. **Set up environment variables** (optional):
    ```bash
    export SECRET_KEY='your-secret-key-here'
-   export GOOGLE_MAPS_API_KEY='your-google-maps-api-key'
    export DATABASE_URL='sqlite:///ecotrack.db'
    ```
 
    Or create a `.env` file:
    ```
    SECRET_KEY=your-secret-key-here
-   GOOGLE_MAPS_API_KEY=your-google-maps-api-key
    DATABASE_URL=sqlite:///ecotrack.db
    ```
 
@@ -123,15 +121,9 @@ prg-1/
 - `chat_message` - Send a message to the chatbot
 - `chat_response` - Receive response from chatbot
 
-## Google Maps API Setup
+## Maps Integration
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select an existing one
-3. Enable the Maps JavaScript API
-4. Create credentials (API Key)
-5. Set the `GOOGLE_MAPS_API_KEY` environment variable
-
-**Note**: The application will work without the Google Maps API key, but map functionality will be limited.
+The application uses [Leaflet.js](https://leafletjs.com/) with OpenStreetMap tiles for displaying interactive maps. No API key is required as it uses free, open-source mapping services. Geocoding (address to coordinates conversion) is handled by OpenStreetMap's Nominatim service.
 
 ## Usage
 

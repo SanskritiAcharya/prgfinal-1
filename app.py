@@ -4,6 +4,8 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from flask_socketio import SocketIO, emit, join_room
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
+from functools import wraps
+from sqlalchemy import text
 import os
 import requests
 
@@ -19,8 +21,7 @@ login_manager.login_view = 'login'
 login_manager.login_message = 'Please log in to access this page.'
 socketio = SocketIO(app, cors_allowed_origins="*", manage_session=False)
 
-# Google Maps API Key (set as environment variable)
-GOOGLE_MAPS_API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY', '')
+# Note: Using OpenStreetMap Nominatim for geocoding (no API key required)
 
 # Database Models
 class User(UserMixin, db.Model):
@@ -32,10 +33,24 @@ class User(UserMixin, db.Model):
     city = db.Column(db.String(100), default='Kathmandu')
     latitude = db.Column(db.Float)
     longitude = db.Column(db.Float)
+    is_admin = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relationships
-    waste_entries = db.relationship('WasteEntry', backref='user', lazy=True)
+    # Waste entries created by this user (uses user_id foreign key)
+    waste_entries = db.relationship(
+        'WasteEntry',
+        foreign_keys='WasteEntry.user_id',
+        backref=db.backref('user', lazy=True),
+        lazy=True
+    )
+    # Waste entries whose status was updated by this user (admin) (uses status_updated_by foreign key)
+    status_updates = db.relationship(
+        'WasteEntry',
+        foreign_keys='WasteEntry.status_updated_by',
+        lazy=True
+    )
+
     chat_messages = db.relationship('ChatMessage', backref='user', lazy=True)
     waste_goals = db.relationship('WasteGoal', backref='user', lazy=True)
     notifications = db.relationship('Notification', backref='user', lazy=True)
@@ -50,6 +65,16 @@ class WasteEntry(db.Model):
     disposal_date = db.Column(db.DateTime, default=datetime.utcnow)
     recycled = db.Column(db.Boolean, default=False)
     recycling_center_id = db.Column(db.Integer, db.ForeignKey('recycling_center.id'))
+    status = db.Column(db.String(20), default='new')  # new, waiting, disposed
+    status_updated_at = db.Column(db.DateTime)
+    status_updated_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    
+    # Relationship for admin who updated status
+    status_updater = db.relationship(
+        'User',
+        foreign_keys=[status_updated_by],
+        lazy=True
+    )
 
 class RecyclingCenter(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -120,6 +145,28 @@ class Achievement(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+# Admin decorator - only allows admins
+def admin_required(f):
+    @wraps(f)
+    @login_required
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_admin:
+            flash('Access denied. Admin privileges required.', 'error')
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# User decorator - only allows regular users (not admins)
+def user_required(f):
+    @wraps(f)
+    @login_required
+    def decorated_function(*args, **kwargs):
+        if current_user.is_admin:
+            flash('This page is for regular users only. Please use the Admin Panel.', 'error')
+            return redirect(url_for('admin_dashboard'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 # Routes
 @app.route('/')
 def index():
@@ -146,7 +193,7 @@ def register():
         
         # Geocode address if provided
         lat, lng = None, None
-        if address and GOOGLE_MAPS_API_KEY:
+        if address:
             lat, lng = geocode_address(f"{address}, {city}, Nepal")
         
         user = User(
@@ -179,7 +226,13 @@ def login():
             login_user(user, remember=remember)
             session['user_id'] = user.id
             next_page = request.args.get('next')
-            return redirect(next_page) if next_page else redirect(url_for('dashboard'))
+            if next_page:
+                return redirect(next_page)
+            # Redirect based on role
+            if user.is_admin:
+                return redirect(url_for('admin_dashboard'))
+            else:
+                return redirect(url_for('dashboard'))
         else:
             flash('Invalid username or password', 'error')
     
@@ -194,7 +247,7 @@ def logout():
     return redirect(url_for('index'))
 
 @app.route('/dashboard')
-@login_required
+@user_required
 def dashboard():
     # Get user's recent waste entries
     recent_entries = WasteEntry.query.filter_by(user_id=current_user.id)\
@@ -204,34 +257,22 @@ def dashboard():
     total_entries = WasteEntry.query.filter_by(user_id=current_user.id).count()
     recycled_count = WasteEntry.query.filter_by(user_id=current_user.id, recycled=True).count()
     
-    # Get nearby recycling centers
-    if current_user.latitude is not None and current_user.longitude is not None:
-        nearby_centers = get_nearby_recycling_centers(current_user.latitude, current_user.longitude, limit=5)
-    else:
-        nearby_centers = []  # empty list if no coordinates
-    
-    # Get user achievements
-    achievements = Achievement.query.filter_by(user_id=current_user.id)\
-        .order_by(Achievement.unlocked_at.desc()).limit(5).all()
-    
-    # Get active goals
-    active_goals = WasteGoal.query.filter_by(user_id=current_user.id, is_completed=False).limit(3).all()
-    
-    # Get unread notifications count
-    unread_notifications = Notification.query.filter_by(user_id=current_user.id, is_read=False).count()
+    # Get waste status counts for tracking
+    new_count = WasteEntry.query.filter_by(user_id=current_user.id, status='new').count()
+    waiting_count = WasteEntry.query.filter_by(user_id=current_user.id, status='waiting').count()
+    disposed_count = WasteEntry.query.filter_by(user_id=current_user.id, status='disposed').count()
     
     return render_template('dashboard.html', 
                          recent_entries=recent_entries,
                          total_entries=total_entries,
                          recycled_count=recycled_count,
-                         nearby_centers=nearby_centers,
-                         achievements=achievements,
-                         active_goals=active_goals,
-                         unread_notifications=unread_notifications,
-                         google_maps_api_key=GOOGLE_MAPS_API_KEY)
+                         new_count=new_count,
+                         waiting_count=waiting_count,
+                         disposed_count=disposed_count,
+                         )
 
 @app.route('/track-waste', methods=['GET', 'POST'])
-@login_required
+@user_required
 def track_waste():
     if request.method == 'POST':
         waste_type = request.form.get('waste_type')
@@ -248,7 +289,8 @@ def track_waste():
             waste_type=waste_type,
             weight_kg=weight_kg,
             description=description,
-            recycled=recycled
+            recycled=recycled,
+            status='new'  # New entries start with 'new' status
         )
         db.session.add(entry)
         db.session.commit()
@@ -262,13 +304,21 @@ def track_waste():
         flash('Waste entry added successfully!', 'success')
         return redirect(url_for('track_waste'))
     
-    entries = WasteEntry.query.filter_by(user_id=current_user.id)\
+    # Get entries grouped by status
+    new_entries = WasteEntry.query.filter_by(user_id=current_user.id, status='new')\
+        .order_by(WasteEntry.disposal_date.desc()).all()
+    waiting_entries = WasteEntry.query.filter_by(user_id=current_user.id, status='waiting')\
+        .order_by(WasteEntry.disposal_date.desc()).all()
+    disposed_entries = WasteEntry.query.filter_by(user_id=current_user.id, status='disposed')\
         .order_by(WasteEntry.disposal_date.desc()).all()
     
-    return render_template('track_waste.html', entries=entries)
+    return render_template('track_waste.html', 
+                         new_entries=new_entries,
+                         waiting_entries=waiting_entries,
+                         disposed_entries=disposed_entries)
 
 @app.route('/toggle-recycled/<int:entry_id>', methods=['POST'])
-@login_required
+@user_required
 def toggle_recycled(entry_id):
     """Toggle recycled status of a waste entry"""
     entry = WasteEntry.query.get_or_404(entry_id)
@@ -289,7 +339,7 @@ def toggle_recycled(entry_id):
     return redirect(url_for('track_waste'))
 
 @app.route('/recycling-centers')
-@login_required
+@user_required
 def recycling_centers():
     centers = RecyclingCenter.query.filter_by(is_active=True).all()
     
@@ -303,11 +353,10 @@ def recycling_centers():
     return render_template('recycling_centers.html', 
                          centers=centers,
                          user_lat=current_user.latitude,
-                         user_lng=current_user.longitude,
-                         google_maps_api_key=GOOGLE_MAPS_API_KEY)
+                         user_lng=current_user.longitude)
 
 @app.route('/pickup-schedules')
-@login_required
+@user_required
 def pickup_schedules():
     schedules = PickupSchedule.query.filter_by(is_active=True).all()
     
@@ -350,7 +399,7 @@ def waste_tips():
     return render_template('waste_tips.html', tips=tips)
 
 @app.route('/statistics')
-@login_required
+@user_required
 def statistics():
     """Detailed statistics page with charts"""
     # Get all user's waste entries
@@ -379,6 +428,37 @@ def statistics():
             monthly_stats[month_key] = {'count': 0, 'weight': 0}
         monthly_stats[month_key]['count'] += 1
         monthly_stats[month_key]['weight'] += entry.weight_kg or 0
+    
+    # Weekly statistics (group by week starting Monday)
+    from datetime import timedelta
+    weekly_stats = {}
+    for entry in entries:
+        # Get the start of the week (Monday)
+        entry_date = entry.disposal_date
+        days_since_monday = entry_date.weekday()
+        week_start = entry_date - timedelta(days=days_since_monday)
+        week_key = week_start.strftime('%Y-%m-%d')
+        
+        if week_key not in weekly_stats:
+            weekly_stats[week_key] = {'count': 0, 'weight': 0}
+        weekly_stats[week_key]['count'] += 1
+        weekly_stats[week_key]['weight'] += entry.weight_kg or 0
+    
+    # Status distribution statistics
+    status_distribution = {
+        'new': 0,
+        'waiting': 0,
+        'disposed': 0,
+        'new_weight': 0,
+        'waiting_weight': 0,
+        'disposed_weight': 0
+    }
+    for entry in entries:
+        status = entry.status or 'new'
+        weight = entry.weight_kg or 0
+        if status in ['new', 'waiting', 'disposed']:
+            status_distribution[status] += 1
+            status_distribution[f'{status}_weight'] += weight
     
     # Environmental impact (rough estimates)
     # Calculate CO2 saved based on waste type
@@ -420,6 +500,8 @@ def statistics():
                          recycled_weight=round(recycled_weight, 2),
                          waste_by_type=waste_by_type,
                          monthly_stats=monthly_stats,
+                         weekly_stats=weekly_stats,
+                         status_distribution=status_distribution,
                          co2_saved=round(co2_saved, 2),
                          trees_saved=round(trees_saved, 2),
                          recycling_rate=round(recycling_rate, 1),
@@ -427,7 +509,7 @@ def statistics():
                          potential_trees=round(potential_trees, 2))
 
 @app.route('/goals')
-@login_required
+@user_required
 def goals():
     """Waste reduction goals page"""
     # Update all goals progress before displaying
@@ -437,7 +519,7 @@ def goals():
     return render_template('goals.html', goals=user_goals)
 
 @app.route('/goals/create', methods=['POST'])
-@login_required
+@user_required
 def create_goal():
     """Create a new waste reduction goal"""
     goal_type = request.form.get('goal_type')
@@ -469,7 +551,7 @@ def create_goal():
     return redirect(url_for('goals'))
 
 @app.route('/notifications')
-@login_required
+@user_required
 def notifications_page():
     """User notifications page"""
     user_notifications = Notification.query.filter_by(user_id=current_user.id)\
@@ -478,7 +560,7 @@ def notifications_page():
     return render_template('notifications.html', notifications=user_notifications, unread_count=unread_count)
 
 @app.route('/notifications/<int:notification_id>/read', methods=['POST'])
-@login_required
+@user_required
 def mark_notification_read(notification_id):
     """Mark a notification as read"""
     notification = Notification.query.get_or_404(notification_id)
@@ -490,7 +572,7 @@ def mark_notification_read(notification_id):
     return jsonify({'success': True})
 
 @app.route('/export-data')
-@login_required
+@user_required
 def export_data():
     """Export user data as CSV"""
     import csv
@@ -519,14 +601,162 @@ def export_data():
     )
 
 @app.route('/calculator')
-@login_required
+@user_required
 def calculator():
     """Waste reduction calculator"""
     return render_template('calculator.html')
 
+# Admin Routes
+@app.route('/admin')
+@admin_required
+def admin_dashboard():
+    """Admin dashboard with overview statistics"""
+    # Get all waste entries grouped by status
+    new_waste = WasteEntry.query.filter_by(status='new').count()
+    waiting_waste = WasteEntry.query.filter_by(status='waiting').count()
+    disposed_waste = WasteEntry.query.filter_by(status='disposed').count()
+    total_waste = WasteEntry.query.count()
+    
+    # Get recent waste entries (prioritize new entries, then waiting, then disposed)
+    recent_entries_new = WasteEntry.query.filter_by(status='new').order_by(WasteEntry.disposal_date.desc()).limit(5).all()
+    recent_entries_waiting = WasteEntry.query.filter_by(status='waiting').order_by(WasteEntry.disposal_date.desc()).limit(3).all()
+    recent_entries_disposed = WasteEntry.query.filter_by(status='disposed').order_by(WasteEntry.disposal_date.desc()).limit(2).all()
+    recent_entries = list(recent_entries_new) + list(recent_entries_waiting) + list(recent_entries_disposed)
+    
+    # Get statistics by waste type
+    waste_by_type = {}
+    for entry in WasteEntry.query.all():
+        waste_type = entry.waste_type
+        if waste_type not in waste_by_type:
+            waste_by_type[waste_type] = {'count': 0, 'weight': 0}
+        waste_by_type[waste_type]['count'] += 1
+        waste_by_type[waste_type]['weight'] += entry.weight_kg or 0
+    
+    return render_template('admin/dashboard.html',
+                         new_waste=new_waste,
+                         waiting_waste=waiting_waste,
+                         disposed_waste=disposed_waste,
+                         total_waste=total_waste,
+                         recent_entries=recent_entries,
+                         waste_by_type=waste_by_type)
+
+@app.route('/admin/waste-management')
+@admin_required
+def admin_waste_management():
+    """Admin page to manage all waste entries"""
+    # Get filter parameters
+    status_filter = request.args.get('status', 'all')
+    waste_type_filter = request.args.get('waste_type', 'all')
+    
+    # Build query
+    query = WasteEntry.query
+    
+    if status_filter != 'all':
+        query = query.filter_by(status=status_filter)
+    
+    if waste_type_filter != 'all':
+        query = query.filter_by(waste_type=waste_type_filter)
+    
+    # Order by disposal date (newest first)
+    entries = query.order_by(WasteEntry.disposal_date.desc()).all()
+    
+    return render_template('admin/waste_management.html',
+                         entries=entries,
+                         current_status=status_filter,
+                         current_waste_type=waste_type_filter)
+
+@app.route('/admin/update-waste-status/<int:entry_id>', methods=['POST'])
+@admin_required
+def admin_update_waste_status(entry_id):
+    """Admin endpoint to update waste entry status"""
+    entry = WasteEntry.query.get_or_404(entry_id)
+    new_status = request.form.get('status')
+    
+    if new_status not in ['new', 'waiting', 'disposed']:
+        flash('Invalid status', 'error')
+        return redirect(url_for('admin_waste_management'))
+    
+    # Update status
+    entry.status = new_status
+    entry.status_updated_at = datetime.utcnow()
+    entry.status_updated_by = current_user.id
+    
+    db.session.commit()
+    
+    # Create notification for the user
+    notification = Notification(
+        user_id=entry.user_id,
+        title='Waste Status Updated',
+        message=f'Your waste entry (ID: {entry_id}) status has been updated to {new_status.title()} by admin.',
+        notification_type='info',
+        link='/track-waste'
+    )
+    db.session.add(notification)
+    db.session.commit()
+    
+    flash(f'Waste entry #{entry_id} status updated to {new_status.title()}', 'success')
+    return redirect(url_for('admin_waste_management'))
+
+@app.route('/admin/users')
+@admin_required
+def admin_users():
+    """Admin page to view all users"""
+    users = User.query.order_by(User.created_at.desc()).all()
+    return render_template('admin/users.html', users=users)
+
+@app.route('/admin/make-admin/<int:user_id>', methods=['POST'])
+@admin_required
+def make_admin(user_id):
+    """Admin endpoint to promote a user to admin"""
+    user = User.query.get_or_404(user_id)
+    user.is_admin = True
+    db.session.commit()
+    flash(f'User {user.username} has been promoted to admin', 'success')
+    return redirect(url_for('admin_users'))
+
+@app.route('/setup-admin', methods=['GET', 'POST'])
+def setup_admin():
+    """Helper route to create first admin user (only works if no admins exist)"""
+    # Check if any admin exists
+    if User.query.filter_by(is_admin=True).count() > 0:
+        flash('Admin users already exist. Please log in as an admin to create more.', 'error')
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        email = request.form.get('email')
+        
+        if not username or not password or not email:
+            flash('All fields are required', 'error')
+            return render_template('setup_admin.html')
+        
+        # Check if user exists
+        user = User.query.filter_by(username=username).first()
+        if not user:
+            # Create new admin user
+            user = User(
+                username=username,
+                email=email,
+                password_hash=generate_password_hash(password),
+                is_admin=True
+            )
+            db.session.add(user)
+            db.session.commit()
+            flash('Admin user created successfully! Please log in.', 'success')
+            return redirect(url_for('login'))
+        else:
+            # Promote existing user to admin
+            user.is_admin = True
+            db.session.commit()
+            flash('User promoted to admin successfully! Please log in.', 'success')
+            return redirect(url_for('login'))
+    
+    return render_template('setup_admin.html')
+
 # API Routes
 @app.route('/api/waste-entries', methods=['GET', 'POST'])
-@login_required
+@user_required
 def api_waste_entries():
     if request.method == 'GET':
         entries = WasteEntry.query.filter_by(user_id=current_user.id).all()
@@ -552,7 +782,7 @@ def api_waste_entries():
         return jsonify({'id': entry.id, 'message': 'Entry created successfully'}), 201
 
 @app.route('/api/recycling-centers', methods=['GET'])
-@login_required
+@user_required
 def api_recycling_centers():
     lat = request.args.get('lat', type=float)
     lng = request.args.get('lng', type=float)
@@ -575,7 +805,7 @@ def api_recycling_centers():
     } for c in centers])
 
 @app.route('/api/pickup-schedules', methods=['GET'])
-@login_required
+@user_required
 def api_pickup_schedules():
     area = request.args.get('area')
     schedules = PickupSchedule.query.filter_by(is_active=True)
@@ -594,7 +824,7 @@ def api_pickup_schedules():
     } for s in schedules.all()])
 
 @app.route('/api/statistics', methods=['GET'])
-@login_required
+@user_required
 def api_statistics():
     """API endpoint for statistics data"""
     entries = WasteEntry.query.filter_by(user_id=current_user.id).all()
@@ -621,7 +851,7 @@ def api_statistics():
     })
 
 @app.route('/api/goals', methods=['GET', 'POST'])
-@login_required
+@user_required
 def api_goals():
     """API endpoint for goals"""
     if request.method == 'GET':
@@ -650,7 +880,7 @@ def api_goals():
         return jsonify({'id': goal.id, 'message': 'Goal created'}), 201
 
 @app.route('/api/notifications', methods=['GET'])
-@login_required
+@user_required
 def api_notifications():
     """API endpoint for notifications"""
     notifications = Notification.query.filter_by(user_id=current_user.id, is_read=False)\
@@ -761,22 +991,23 @@ def handle_chat_message(data):
 
 # Helper Functions
 def geocode_address(address):
-    """Geocode an address using Google Maps API"""
-    if not GOOGLE_MAPS_API_KEY:
-        return None, None
-    
+    """Geocode an address using OpenStreetMap Nominatim API"""
     try:
-        url = f"https://maps.googleapis.com/maps/api/geocode/json"
+        url = "https://nominatim.openstreetmap.org/search"
         params = {
-            'address': address,
-            'key': GOOGLE_MAPS_API_KEY
+            'q': address,
+            'format': 'json',
+            'limit': 1
         }
-        response = requests.get(url, params=params, timeout=5)
+        headers = {
+            'User-Agent': 'Ecotrack Waste Management App'  # Required by Nominatim
+        }
+        response = requests.get(url, params=params, headers=headers, timeout=5)
         data = response.json()
         
-        if data['status'] == 'OK' and data['results']:
-            location = data['results'][0]['geometry']['location']
-            return location['lat'], location['lng']
+        if data and len(data) > 0:
+            location = data[0]
+            return float(location['lat']), float(location['lon'])
     except Exception as e:
         print(f"Geocoding error: {e}")
     
@@ -1035,10 +1266,60 @@ def generate_chatbot_response(message, user_id=None):
 def init_db():
     """Initialize database with sample data"""
     db.create_all()
+    
+    # Add new columns if they don't exist (for existing databases)
+    # Using raw SQL for SQLite compatibility
     try:
-        db.engine.execute('ALTER TABLE recycling_center ADD COLUMN email TEXT;')
+        # Add is_admin column to user table
+        try:
+            db.session.execute(text('ALTER TABLE user ADD COLUMN is_admin BOOLEAN DEFAULT 0;'))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            # Column already exists, ignore
+            pass
+        
+        # Add status columns to waste_entry table
+        try:
+            db.session.execute(text('ALTER TABLE waste_entry ADD COLUMN status VARCHAR(20) DEFAULT "new";'))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            # Column already exists, ignore
+            pass
+        
+        try:
+            db.session.execute(text('ALTER TABLE waste_entry ADD COLUMN status_updated_at DATETIME;'))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            pass
+        
+        try:
+            db.session.execute(text('ALTER TABLE waste_entry ADD COLUMN status_updated_by INTEGER;'))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            pass
+        
+        try:
+            db.session.execute(text('ALTER TABLE recycling_center ADD COLUMN email TEXT;'))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            # If column already exists, ignore the error
+            pass
+    except Exception as e:
+        print(f"Database migration note: {e}")
+        # Continue anyway - columns may already exist
+    
+    # Update existing waste entries to have 'new' status if they don't have one
+    try:
+        entries_without_status = WasteEntry.query.filter(WasteEntry.status == None).all()
+        for entry in entries_without_status:
+            entry.status = 'new'
+        db.session.commit()
     except Exception:
-        # If column already exists, ignore the error
         pass
     # Add sample recycling centers for Nepal (Kathmandu area)
     if RecyclingCenter.query.count() == 0:

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Setup Admin - Ecotrack{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div style="max-width: 500px; margin: 4rem auto;">
+        <h1 class="page-title">Setup Admin User</h1>
+        <p style="text-align: center; color: var(--text-secondary, #666); margin-bottom: 2rem;">
+            Create the first admin user for the system. This page is only accessible when no admin users exist.
+        </p>
+        
+        <div class="tracking-form-card">
+            <form method="POST" action="{{ url_for('setup_admin') }}">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required placeholder="Enter username">
+                </div>
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" required placeholder="Enter email">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required placeholder="Enter password">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Create Admin User</button>
+            </form>
+        </div>
+        
+        <p style="text-align: center; margin-top: 1rem; font-size: 0.9rem; color: var(--text-light, #999);">
+            <a href="{{ url_for('login') }}">Back to Login</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

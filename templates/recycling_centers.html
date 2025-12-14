@@ -3,13 +3,12 @@
 {% block title %}Recycling Centers - Ecotrack{% endblock %}
 
 {% block extra_head %}
-{% if google_maps_api_key %}
-<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places&callback=initMap" async defer></script>
-{% else %}
-<script>
-console.warn('Google Maps API key not configured. Map will not load.');
-</script>
-{% endif %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
 {% endblock %}
 
 {% block content %}
@@ -52,89 +51,80 @@ console.warn('Google Maps API key not configured. Map will not load.');
 <script>
 let map;
 let markers = [];
-let infoWindows = [];
+let userMarker = null;
 
-// Make initMap globally accessible for Google Maps callback
-window.initMap = function() {
+// Initialize map when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
     const mapElement = document.getElementById('map');
     if (!mapElement) {
         console.error('Map element not found');
         return;
     }
 
-    const defaultLocation = { lat: 27.7172, lng: 85.3240 }; // Kathmandu coordinates
+    const defaultLocation = [27.7172, 85.3240]; // Kathmandu coordinates [lat, lng]
     
     try {
-        map = new google.maps.Map(mapElement, {
-            zoom: 12,
-            center: defaultLocation,
-            mapTypeControl: true,
-            streetViewControl: true,
-            fullscreenControl: true
-        });
+        // Initialize Leaflet map
+        map = L.map('map').setView(defaultLocation, 12);
+
+        // Add OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(map);
 
         // Add user location if available
         {% if user_lat and user_lng %}
-        const userLocation = { lat: {{ user_lat }}, lng: {{ user_lng }} };
-        const userMarker = new google.maps.Marker({
-            position: userLocation,
-            map: map,
+        const userLocation = [{{ user_lat }}, {{ user_lng }}];
+        userMarker = L.marker(userLocation, {
             title: 'Your Location',
-            icon: {
-                path: google.maps.SymbolPath.CIRCLE,
-                scale: 8,
-                fillColor: '#4285F4',
-                fillOpacity: 1,
-                strokeColor: '#FFFFFF',
-                strokeWeight: 2
-            }
-        });
-        map.setCenter(userLocation);
+            icon: L.divIcon({
+                className: 'user-location-marker',
+                html: '<div style="background-color: #4285F4; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>',
+                iconSize: [16, 16],
+                iconAnchor: [8, 8]
+            })
+        }).addTo(map);
+        userMarker.bindPopup('<strong>Your Location</strong>').openPopup();
+        map.setView(userLocation, 12);
         {% endif %}
 
         // Add markers for recycling centers
         {% for center in centers %}
-        const marker{{ center.id }} = new google.maps.Marker({
-            position: { lat: {{ center.latitude }}, lng: {{ center.longitude }} },
-            map: map,
-            title: '{{ center.name|replace("'", "\\'") }}',
-            animation: google.maps.Animation.DROP
-        });
+        const marker{{ center.id }} = L.marker([{{ center.latitude }}, {{ center.longitude }}], {
+            title: '{{ center.name|replace("'", "\\'") }}'
+        }).addTo(map);
 
-        const infoWindow{{ center.id }} = new google.maps.InfoWindow({
-            content: `
-                <div style="padding: 10px; max-width: 300px;">
-                    <h3 style="margin: 0 0 10px 0; color: #2c3e50;">{{ center.name|replace("'", "\\'") }}</h3>
-                    <p style="margin: 5px 0;"><strong>Address:</strong> {{ center.address|replace("'", "\\'") }}</p>
-                    {% if center.phone %}<p style="margin: 5px 0;"><strong>Phone:</strong> {{ center.phone }}</p>{% endif %}
-                    {% if center.accepts_types %}<p style="margin: 5px 0;"><strong>Accepts:</strong> {{ center.accepts_types|replace("'", "\\'") }}</p>{% endif %}
-                    {% if center.hours %}<p style="margin: 5px 0;"><strong>Hours:</strong> {{ center.hours }}</p>{% endif %}
-                </div>
-            `
-        });
+        const popupContent{{ center.id }} = `
+            <div style="padding: 10px; max-width: 300px;">
+                <h3 style="margin: 0 0 10px 0; color: #2c3e50;">{{ center.name|replace("'", "\\'") }}</h3>
+                <p style="margin: 5px 0;"><strong>Address:</strong> {{ center.address|replace("'", "\\'") }}</p>
+                {% if center.phone %}<p style="margin: 5px 0;"><strong>Phone:</strong> {{ center.phone }}</p>{% endif %}
+                {% if center.accepts_types %}<p style="margin: 5px 0;"><strong>Accepts:</strong> {{ center.accepts_types|replace("'", "\\'") }}</p>{% endif %}
+                {% if center.hours %}<p style="margin: 5px 0;"><strong>Hours:</strong> {{ center.hours }}</p>{% endif %}
+            </div>
+        `;
 
-        marker{{ center.id }}.addListener('click', () => {
-            // Close all other info windows
-            infoWindows.forEach(iw => iw.close());
-            infoWindow{{ center.id }}.open(map, marker{{ center.id }});
-        });
-
+        marker{{ center.id }}.bindPopup(popupContent{{ center.id }});
         markers.push(marker{{ center.id }});
-        infoWindows.push(infoWindow{{ center.id }});
         {% endfor %}
 
         // If no centers, show message
         {% if not centers %}
-        const noCentersDiv = document.createElement('div');
-        noCentersDiv.innerHTML = '<p style="text-align: center; padding: 20px; color: #666;">No recycling centers available</p>';
-        map.controls[google.maps.ControlPosition.TOP_CENTER].push(noCentersDiv);
+        const noCentersDiv = L.control({position: 'topcenter'});
+        noCentersDiv.onAdd = function(map) {
+            const div = L.DomUtil.create('div', 'no-centers-message');
+            div.innerHTML = '<p style="text-align: center; padding: 20px; color: #666; background: white; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">No recycling centers available</p>';
+            return div;
+        };
+        noCentersDiv.addTo(map);
         {% endif %}
 
     } catch (error) {
         console.error('Error initializing map:', error);
-        document.getElementById('map').innerHTML = '<div style="padding: 20px; text-align: center; color: #e74c3c;"><p>Error loading map. Please check your Google Maps API key configuration.</p></div>';
+        document.getElementById('map').innerHTML = '<div style="padding: 20px; text-align: center; color: #e74c3c;"><p>Error loading map. Please refresh the page.</p></div>';
     }
-};
+});
 
 function showOnMap(lat, lng, name) {
     if (!map) {
@@ -142,41 +132,17 @@ function showOnMap(lat, lng, name) {
         return;
     }
     
-    const location = { lat: lat, lng: lng };
-    map.setCenter(location);
-    map.setZoom(15);
+    const location = [lat, lng];
+    map.setView(location, 15);
     
-    // Find and open info window for this marker
-    markers.forEach((marker, index) => {
-        const markerPos = marker.getPosition();
-        if (Math.abs(markerPos.lat() - lat) < 0.0001 && Math.abs(markerPos.lng() - lng) < 0.0001) {
-            if (infoWindows[index]) {
-                // Close all other info windows
-                infoWindows.forEach(iw => iw.close());
-                infoWindows[index].open(map, marker);
-            }
+    // Find and open popup for this marker
+    markers.forEach((marker) => {
+        const markerPos = marker.getLatLng();
+        if (Math.abs(markerPos.lat - lat) < 0.0001 && Math.abs(markerPos.lng - lng) < 0.0001) {
+            marker.openPopup();
         }
     });
 }
-
-// Fallback initialization if callback doesn't work
-{% if google_maps_api_key %}
-document.addEventListener('DOMContentLoaded', function() {
-    // Wait a bit for Google Maps to load if callback didn't fire
-    setTimeout(function() {
-        if (typeof google !== 'undefined' && typeof google.maps !== 'undefined' && !map) {
-            window.initMap();
-        } else if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
-            console.warn('Google Maps API not loaded. Check your API key.');
-            document.getElementById('map').innerHTML = '<div style="padding: 20px; text-align: center; color: #e74c3c;"><p>Google Maps API not loaded. Please configure your API key.</p><p style="font-size: 0.9em; margin-top: 10px;">Set GOOGLE_MAPS_API_KEY environment variable or update app.py</p></div>';
-        }
-    }, 1000);
-});
-{% else %}
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('map').innerHTML = '<div style="padding: 20px; text-align: center; color: #f39c12;"><p>Google Maps API key not configured.</p><p style="font-size: 0.9em; margin-top: 10px;">To enable maps, set the GOOGLE_MAPS_API_KEY environment variable.</p></div>';
-});
-{% endif %}
 </script>
 {% endblock %}
 
